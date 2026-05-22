@@ -13,4 +13,5 @@ public interface IKnowledgeRetrievalRepository
     Task<int> GetDistinctSourceCountAsync(string className, string groupProperty);
     Task<System.Text.Json.JsonElement> GetRawInteractionLogsAsync(int limit);
     Task LogInteractionAsync(string query, string answer, bool wasSuccessful);
+    Task BatchIngestReleaseNodesAsync(IEnumerable<SoftwareReleaseNode> nodes);
 }

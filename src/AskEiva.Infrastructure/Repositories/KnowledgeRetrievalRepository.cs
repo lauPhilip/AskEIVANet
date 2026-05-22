@@ -269,4 +269,39 @@ public class KnowledgeRetrievalRepository : IKnowledgeRetrievalRepository
             Console.WriteLine($"[Weaviate Telemetry Error] Failed to write active interaction log: {ex.Message}");
         }
     }
+
+    // =================================================================================
+    // 💡 SOFTWARE RELEASE BATCH INGESTION MATRIX PLUG-IN
+    // =================================================================================
+    
+    public async Task BatchIngestReleaseNodesAsync(IEnumerable<SoftwareReleaseNode> nodes)
+    {
+        var url = "v1/batch/objects";
+        
+        var batchObjects = nodes.Select(node => new
+        {
+            @class = "SoftwareReleaseNode",
+            properties = new
+            {
+                product = node.Product,
+                version = node.Version,
+                release_date = node.ReleaseDate.ToString("o"),
+                section_header = node.SectionHeader,
+                content_chunk = node.ContentChunk,
+                ref_tickets = node.RefTickets
+            }
+        }).ToList();
+
+        var payload = new { objects = batchObjects };
+
+        try
+        {
+            var response = await _httpClient.PostAsJsonAsync(url, payload);
+            response.EnsureSuccessStatusCode();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[Infrastructure Batch Error] Failed pushing release nodes to database: {ex.Message}");
+        }
+    }
 }
