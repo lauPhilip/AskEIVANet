@@ -109,12 +109,12 @@ public class ReleaseNotesScraper : IReleaseNotesScraper
                     ContentChunk = target.Note,
                     RefTickets = string.Empty
                 });
-                Console.WriteLine($"[Scraper Note Sync] Processed standalone manifest footnote metadata for: {fullTitle}");
+                Console.WriteLine($"[Scraper Note Sync] Process Processed standalone manifest footnote metadata for: {fullTitle}");
             }
             return fileChunks;
         }
 
-        // 💡 SCENARIO B: Full Document Download Sequence
+        // 💡 SCENARIO B: Full Document Download Sequence & Robust Page Processing
         try
         {
             string safeRelativePath = target.RelativeUrl;
@@ -136,20 +136,39 @@ public class ReleaseNotesScraper : IReleaseNotesScraper
             Console.WriteLine($"[Scraper Network Stream] Requesting [{releaseType}] URI path: {safeRelativePath}");
             byte[] downloadedPdfBytes = await _httpClient.GetByteArrayAsync(safeRelativePath);
             
-            string rawDocumentText = ExtractTextFromPdfBytes(downloadedPdfBytes);
+            // 💡 OPTIMIZATION: Process page-by-page directly instead of flattening to a single giant string
+            using (var memoryStream = new MemoryStream(downloadedPdfBytes))
+            using (var document = PdfDocument.Open(memoryStream))
+            {
+                int pageNumber = 1;
+                foreach (var page in document.GetPages())
+                {
+                    string pageText = page.Text;
+                    if (string.IsNullOrWhiteSpace(pageText) || pageText.Length < 20)
+                    {
+                        pageNumber++;
+                        continue; 
+                    }
 
-            fileChunks = ChunkReleaseNotesContent(
-                rawDocumentText, 
-                categoryName, 
-                productName, 
-                releaseType, 
-                explicitVersion, 
-                fullTitle, 
-                target.Note, // Forwarded note to child chunks
-                target.ReleaseDate
-            );
+                    // Parse this concrete page's text entries safely via the robust page partition system
+                    var pageChunks = ChunkSinglePageContent(
+                        pageText, 
+                        pageNumber,
+                        categoryName, 
+                        productName, 
+                        releaseType, 
+                        explicitVersion, 
+                        fullTitle, 
+                        target.Note, 
+                        target.ReleaseDate
+                    );
 
-            Console.WriteLine($"[Scraper Index Task] Successfully structured target record: {fullTitle} ({fileChunks.Count} chunks).");
+                    fileChunks.AddRange(pageChunks);
+                    pageNumber++;
+                }
+            }
+
+            Console.WriteLine($"[Scraper Index Task] Successfully structured target record: {fullTitle} ({fileChunks.Count} total semantic chunks generated across all pages).");
         }
         catch (Exception assetEx)
         {
@@ -175,21 +194,24 @@ public class ReleaseNotesScraper : IReleaseNotesScraper
         return sb.ToString();
     }
 
-    private List<SoftwareReleaseNode> ChunkReleaseNotesContent(
-        string text, 
+    private List<SoftwareReleaseNode> ChunkSinglePageContent(
+        string pageText, 
+        int pageNumber,
         string groupCategory, 
         string product, 
-        string releaseType,
+        string releaseType, 
         string version, 
         string fullVersionTitle, 
         string metadataNote,
         DateTime date)
     {
         var chunks = new List<SoftwareReleaseNode>();
+        
+        // Matches subsection headings on this specific page context
         var sectionRegex = new Regex(@"(?<header>\d+\.\d+\.\d+\s+[A-Za-z0-9\s\(\)\.\-\/]+)\r?\n(?<content>.*?)(?=\d+\.\d+\.\d+\s+[A-Za-z0-9\s\(\)\.\-\/]+|\z)", RegexOptions.Singleline);
         var ticketRegex = new Regex(@"\[(?:FD|J|DO)?-?(\d+)\]", RegexOptions.IgnoreCase);
 
-        var matches = sectionRegex.Matches(text);
+        var matches = sectionRegex.Matches(pageText);
         foreach (Match match in matches)
         {
             string header = match.Groups["header"].Value.Trim();
@@ -210,27 +232,66 @@ public class ReleaseNotesScraper : IReleaseNotesScraper
                 FullVersionTitle = fullVersionTitle,
                 MetadataNote = metadataNote,
                 ReleaseDate = date,
-                SectionHeader = header,
+                SectionHeader = $"{header} (Page {pageNumber})",
                 ContentChunk = content,
                 RefTickets = joinedTickets
             });
         }
 
+        // 💡 DEFENSIVE FALLBACK PARSER: If a page doesn't match our regex headers, 
+        // partition the raw page text by words to guarantee zero text loss.
         if (!chunks.Any())
         {
-            chunks.Add(new SoftwareReleaseNode
+            var ticketMatches = ticketRegex.Matches(pageText);
+            var ticketsList = ticketMatches.Cast<Match>().Select(m => m.Groups[1].Value.Trim()).Distinct();
+            string joinedTickets = string.Join(" ", ticketsList);
+
+            // If the page is relatively short, commit it as a single coherent block
+            if (pageText.Length <= 2500)
             {
-                GroupCategory = groupCategory,
-                Product = product,
-                ReleaseType = releaseType,
-                Version = version,
-                FullVersionTitle = fullVersionTitle,
-                MetadataNote = metadataNote,
-                ReleaseDate = date,
-                SectionHeader = "General Functional Modifications Overview",
-                ContentChunk = text.Length > 4000 ? text.Substring(0, 4000) : text,
-                RefTickets = ""
-            });
+                chunks.Add(new SoftwareReleaseNode
+                {
+                    GroupCategory = groupCategory,
+                    Product = product,
+                    ReleaseType = releaseType,
+                    Version = version,
+                    FullVersionTitle = fullVersionTitle,
+                    MetadataNote = metadataNote,
+                    ReleaseDate = date,
+                    SectionHeader = $"General Specifications Overview - Page {pageNumber}",
+                    ContentChunk = pageText.Trim(),
+                    RefTickets = joinedTickets
+                });
+            }
+            else
+            {
+                // If it's a massive page layout data block, split it into 400-word blocks with a 50-word overlap window
+                var words = pageText.Split(new[] { ' ', '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries);
+                int chunkSize = 400;
+                int overlap = 50;
+
+                for (int i = 0; i < words.Length; i += (chunkSize - overlap))
+                {
+                    var chunkWords = words.Skip(i).Take(chunkSize).ToList();
+                    if (chunkWords.Count < 20) break; // Skip tiny dangling sentence remnants
+
+                    string syntheticChunkText = string.Join(" ", chunkWords);
+
+                    chunks.Add(new SoftwareReleaseNode
+                    {
+                        GroupCategory = groupCategory,
+                        Product = product,
+                        ReleaseType = releaseType,
+                        Version = version,
+                        FullVersionTitle = fullVersionTitle,
+                        MetadataNote = metadataNote,
+                        ReleaseDate = date,
+                        SectionHeader = $"General Specifications Overview - Page {pageNumber} (Part {i / (chunkSize - overlap) + 1})",
+                        ContentChunk = syntheticChunkText,
+                        RefTickets = joinedTickets
+                    });
+                }
+            }
         }
 
         return chunks;
