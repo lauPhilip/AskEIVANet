@@ -13,11 +13,27 @@
 
 <MudContainer MaxWidth="MaxWidth.Large" Class="pa-0" Style="height: calc(100vh - 130px); display: flex; flex-direction: column;">
     
-    <MudPaper Elevation="0" Class="pa-4 mb-3 d-flex align-center justify-space-between" Style="border: 1px solid #E2E8F0; background: #FFFFFF; border-radius: 6px;">
-        <div class="d-flex align-center gap-4">
-            <MudText Typo="Typo.subtitle2" Class="font-weight-bold" Style="color: #0A2540;">Cluster Node:</MudText>
-            <MudChip T="string" Color="Color.Success" Variant="Variant.Text" Size="Size.Small" Icon="@Icons.Material.Filled.CloudDone">Weaviate Online</MudChip>
-            <MudChip T="string" Color="Color.Primary" Variant="Variant.Text" Size="Size.Small" Icon="@Icons.Material.Filled.Memory">Context Memory Active (@(_sessionHistory.Count) turns)</MudChip>
+    <MudPaper Elevation="0" Class="pa-4 mb-3 d-flex align-center justify-space-between flex-wrap gap-4" Style="border: 1px solid #E2E8F0; background: #FFFFFF; border-radius: 6px;">
+        <div class="d-flex align-center flex-wrap gap-4">
+            <div class="d-flex align-center gap-2 mr-2">
+                <MudText Variant="Variant.Text" Typo="Typo.subtitle2" Class="font-weight-bold" Style="color: #0A2540;">Cluster Node:</MudText>
+                <MudChip T="string" Color="Color.Success" Variant="Variant.Text" Size="Size.Small" Icon="@Icons.Material.Filled.CloudDone">Weaviate Online</MudChip>
+                <MudChip T="string" Color="Color.Primary" Variant="Variant.Text" Size="Size.Small" Icon="@Icons.Material.Filled.Memory">Context Memory Active (@(_sessionHistory.Count) turns)</MudChip>
+            </div>
+
+            <div class="d-flex align-center gap-3 style-filter-group" style="border-left: 1px solid #CBD5E1; padding-left: 16px;">
+                <MudSwitch @bind-Value="_includeTickets" Color="Color.Success" Size="Size.Small" T="bool">
+                    <MudText Typo="Typo.caption" Class="@(_includeTickets ? "font-weight-bold color-active" : "color-inactive")">Tickets</MudText>
+                </MudSwitch>
+                
+                <MudSwitch @bind-Value="_includeReleaseNotes" Color="Color.Info" Size="Size.Small" T="bool">
+                    <MudText Typo="Typo.caption" Class="@(_includeReleaseNotes ? "font-weight-bold color-active" : "color-inactive")">ReleaseNotes</MudText>
+                </MudSwitch>
+                
+                <MudSwitch @bind-Value="_includeDocumentation" Color="Color.Primary" Size="Size.Small" T="bool">
+                    <MudText Typo="Typo.caption" Class="@(_includeDocumentation ? "font-weight-bold color-active" : "color-inactive")">Documentation</MudText>
+                </MudSwitch>
+            </div>
         </div>
         
         <MudButton Variant="Variant.Outlined" 
@@ -51,22 +67,26 @@
                         @if (msg.SemanticMatches.Any())
                         {
                             <div class="mt-4 pt-3" style="border-top: 1px solid #F1F5F9;">
-                                <MudText Typo="Typo.caption" Class="font-weight-bold d-block mb-2" Style="color: #64748B;">📌 Reference:</MudText>
+                                <MudText Typo="Typo.caption" Class="font-weight-bold d-block mb-2" Style="color: #64748B;">📌 Reference Citations:</MudText>
                                 <div class="overflow-x-auto">
                                     <table class="eiva-citation-table" style="width: 100%; border-collapse: collapse; font-size: 0.75rem;">
                                         <thead>
                                             <tr style="background: #F1F5F9; border-bottom: 2px solid #CBD5E1; color: #475569;">
                                                 <th style="padding: 6px; text-align: left;">Type</th>
-                                                <th style="padding: 6px; text-align: left;">Title</th>
-                                                <th style="padding: 6px; text-align: right;">Distance Score</th>
+                                                <th style="padding: 6px; text-align: left;">Title / Section Origin</th>
+                                                <th style="padding: 6px; text-align: right;">Proximity Score</th>
                                             </tr>
                                         </thead>
                                         <tbody>
                                             @foreach (var match in msg.SemanticMatches)
                                             {
                                                 <tr style="border-bottom: 1px solid #E2E8F0; color: #334155;">
-                                                    <td style="padding: 6px; font-weight: bold;"><span class="type-badge @match.SourceType.ToLower()">@match.SourceType</span></td>
-                                                    <td style="padding: 6px;"><a href="@match.SourceUrl" target="_blank" style="color: #0284C7; font-weight: 500; text-decoration: none;">@match.Title</a></td>
+                                                    <td style="padding: 6px; font-weight: bold;">
+                                                        <span class="type-badge @match.SourceType.ToLower()">@match.SourceType</span>
+                                                    </td>
+                                                    <td style="padding: 6px;">
+                                                        <a href="@match.SourceUrl" target="_blank" style="color: #0284C7; font-weight: 500; text-decoration: none;">@match.Title</a>
+                                                    </td>
                                                     <td style="padding: 6px; text-align: right; font-family: monospace;">@match.ConfidenceScore.ToString("F4")</td>
                                                 </tr>
                                             }
@@ -84,7 +104,7 @@
                     <div class="pa-4 rounded bg-white shadow-sm" style="border: 1px solid #E2E8F0;">
                         <div class="d-flex align-center gap-3">
                             <MudProgressCircular Color="Color.Primary" Size="Size.Small" Indeterminate="true" />
-                            <MudText Typo="Typo.caption" Style="color: #64748B;">Retrieving a response...</MudText>
+                            <MudText Typo="Typo.caption" Style="color: #64748B;">Retrieving and distilling subsea knowledge engines...</MudText>
                         </div>
                     </div>
                 </div>
@@ -95,7 +115,7 @@
     <MudPaper Elevation="0" Class="pa-3" Style="border: 1px solid #E2E8F0; background: #FFFFFF; border-radius: 8px;">
         <div class="d-flex align-center gap-3">
             <MudTextField @bind-Value="_currentPrompt" 
-                          Placeholder="Ask a follow up question (e.g., Can you show me an example command syntax?)..." 
+                          Placeholder="Ask a follow up question regarding NaviSuite models, ROTV tracking systems, or ticket behaviors..." 
                           Variant="Variant.Text" 
                           Underline="false"
                           OnKeyDown="HandleKeyDown"
@@ -106,53 +126,77 @@
             <MudIconButton Icon="@Icons.Material.Filled.Send" 
                            Color="Color.Primary" 
                            OnClick="SubmitPrompt" 
-                           Disabled="@(string.IsNullOrWhiteSpace(_currentPrompt) || _isProcessing)" />
+                           Disabled="@(string.IsNullOrWhiteSpace(_currentPrompt) || _isProcessing || !IsAnySourceChecked())" />
         </div>
     </MudPaper>
 </MudContainer>
+
+<style>
+    .color-active { color: #0A2540 !important; }
+    .color-inactive { color: #94A3B8 !important; }
+    .type-badge { display: inline-block; padding: 2px 6px; border-radius: 4px; font-size: 10px; text-transform: uppercase; }
+    .type-badge.ticket { background: #DCFCE7; color: #15803D; }
+    .type-badge.releasenote { background: #E0F2FE; color: #0369A1; }
+    .type-badge.documentation { background: #F3E8FF; color: #6B21A8; }
+</style>
 
 @code {
     private string _currentPrompt = string.Empty;
     private bool _isProcessing = false;
     private string _streamingChunkBuffer = string.Empty;
+
+    // 💡 TOGGLE TRACKING STATES
+    private bool _includeTickets = true;
+    private bool _includeReleaseNotes = true;
+    private bool _includeDocumentation = true;
     
-    //  Running runtime context lists tracking session-level memory state
     private List<ChatTurn> _sessionHistory = new();
     
     private List<UIConversationMessage> _messageStream = new()
     {
         new UIConversationMessage 
         { 
-            Text = "Ask a question about eiva", 
+            Text = "Welcome to AskEIVA. I have mapped the software release records, dynamic manuals, and historical interaction repositories. How can I help you support vessel operations today?", 
             IsUser = false 
         }
     };
 
+    private bool IsAnySourceChecked() => _includeTickets || _includeReleaseNotes || _includeDocumentation;
+
     private async Task SubmitPrompt()
     {
-        if (string.IsNullOrWhiteSpace(_currentPrompt) || _isProcessing) return;
+        if (string.IsNullOrWhiteSpace(_currentPrompt) || _isProcessing || !IsAnySourceChecked()) return;
 
         var userText = _currentPrompt;
         _currentPrompt = string.Empty;
         _isProcessing = true;
         _streamingChunkBuffer = string.Empty;
 
-        // Append to local display stream
         _messageStream.Add(new UIConversationMessage { Text = userText, IsUser = true });
         await ScrollToBottom();
 
-        // Initialize output token block bubble
         var responseMessage = new UIConversationMessage { Text = "", IsUser = false };
         _messageStream.Add(responseMessage);
 
         try
         {
-            // Sweep Weaviate vector collections
-            var semanticMatches = await RetrievalRepository.SearchSemanticChunksAsync(userText, limit: 3);
-            responseMessage.SemanticMatches = semanticMatches.ToList();
+            // 1. Fetch raw underlying context structures ranked semantically via Weaviate
+            var completeSemanticMatches = await RetrievalRepository.SearchSemanticChunksAsync(userText, limit: 6);
+            
+            // 💡 FILTER GATE: Prune returned results according to active checkbox states
+            var filteredMatches = completeSemanticMatches.Where(m => 
+                (m.SourceType.Equals("Ticket", StringComparison.OrdinalIgnoreCase) && _includeTickets) ||
+                (m.SourceType.Equals("ReleaseNote", StringComparison.OrdinalIgnoreCase) && _includeReleaseNotes) ||
+                (m.SourceType.Equals("Documentation", StringComparison.OrdinalIgnoreCase) && _includeDocumentation)
+            ).Take(3).ToList();
 
-            // Fire the rolling history stream block pass-through
-            await foreach (var chunk in ChatService.GenerateStreamingChatResponseAsync(userText, responseMessage.SemanticMatches, Enumerable.Empty<KnowledgeTriple>(), _sessionHistory))
+            responseMessage.SemanticMatches = filteredMatches;
+
+            // 2. Extract structured Entity Triples natively to support GraphRAG context mapping over time
+            var activeGraphTriples = await RetrievalRepository.SearchGraphTriplesAsync(userText, limit: 5);
+
+            // 3. Dispatch streaming context combination down to your Mistral Service
+            await foreach (var chunk in ChatService.GenerateStreamingChatResponseAsync(userText, responseMessage.SemanticMatches, activeGraphTriples, _sessionHistory))
             {
                 _streamingChunkBuffer += chunk;
                 responseMessage.Text = _streamingChunkBuffer;
@@ -160,15 +204,14 @@
                 await ScrollToBottom();
             }
 
-            // Turn finalized successfully, commit both turns to history memory cache
             _sessionHistory.Add(new ChatTurn(userText, IsUser: true));
             _sessionHistory.Add(new ChatTurn(_streamingChunkBuffer, IsUser: false));
 
+            // Offload async background task to log operational insights safely
             _ = Task.Run(async () => 
             {
                 try
                 {
-                    // Mark as successful if we harvested text responses from Mistral securely
                     bool isSuccess = !string.IsNullOrWhiteSpace(_streamingChunkBuffer) && !_streamingChunkBuffer.StartsWith("Stream Memory Allocation Error");
                     await RetrievalRepository.LogInteractionAsync(userText, _streamingChunkBuffer, isSuccess);
                 }
@@ -189,7 +232,6 @@
         }
     }
 
-    // Completely flushes conversational structures back to initial boot vectors
     private void ClearConversationSession()
     {
         _sessionHistory.Clear();
