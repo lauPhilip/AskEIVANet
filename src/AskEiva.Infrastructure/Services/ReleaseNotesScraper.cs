@@ -9,6 +9,7 @@ using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using AskEiva.Domain.Entities;
 using AskEiva.Domain.Services;
+using AskEiva.Domain.Repositories; // Ensure this namespace is imported
 using UglyToad.PdfPig;
 
 namespace AskEiva.Infrastructure.Services;
@@ -16,17 +17,18 @@ namespace AskEiva.Infrastructure.Services;
 public class ReleaseNotesScraper : IReleaseNotesScraper
 {
     private readonly HttpClient _httpClient;
+    private readonly IKnowledgeRetrievalRepository _knowledgeRepository; // 💡 NEW
 
-    public ReleaseNotesScraper(HttpClient httpClient)
+    // 💡 UPDATED: Pass the knowledge repository down via Dependency Injection
+    public ReleaseNotesScraper(HttpClient httpClient, IKnowledgeRetrievalRepository knowledgeRepository)
     {
         _httpClient = httpClient;
+        _knowledgeRepository = knowledgeRepository;
     }
 
     public async Task<IEnumerable<SoftwareReleaseNode>> ScrapeAndChunkAllReleaseNotesAsync()
     {
         var globalDiscoveredNodes = new List<SoftwareReleaseNode>();
-        
-        // Locate the centralized structural manifest layout document
         string manifestPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "release_notes_manifest.json");
 
         if (!File.Exists(manifestPath))
@@ -56,6 +58,15 @@ public class ReleaseNotesScraper : IReleaseNotesScraper
                     {
                         foreach (var target in product.Latest)
                         {
+                            string explicitVersion = GetCleanVersionString(target.Version);
+                            
+                            // 💡 THE IDEMPOTENCY GATE: Check if Weaviate already knows about this combination
+                            if (await _knowledgeRepository.DoesProductVersionExistAsync(product.Name, explicitVersion))
+                            {
+                                Console.WriteLine($"[Scraper Guard] Track skipped: {product.Name} v{explicitVersion} is already indexed and up to date.");
+                                continue;
+                            }
+
                             var nodes = await ProcessSinglePdfUrlTrackAsync(target, category.Name, product.Name, "Latest");
                             globalDiscoveredNodes.AddRange(nodes);
                         }
@@ -66,6 +77,15 @@ public class ReleaseNotesScraper : IReleaseNotesScraper
                     {
                         foreach (var target in product.Archive)
                         {
+                            string explicitVersion = GetCleanVersionString(target.Version);
+
+                            // 💡 THE IDEMPOTENCY GATE: Check if Weaviate already knows about this combination
+                            if (await _knowledgeRepository.DoesProductVersionExistAsync(product.Name, explicitVersion))
+                            {
+                                Console.WriteLine($"[Scraper Guard] Track skipped: {product.Name} v{explicitVersion} is already indexed and up to date.");
+                                continue;
+                            }
+
                             var nodes = await ProcessSinglePdfUrlTrackAsync(target, category.Name, product.Name, "Archive");
                             globalDiscoveredNodes.AddRange(nodes);
                         }
@@ -81,17 +101,21 @@ public class ReleaseNotesScraper : IReleaseNotesScraper
         return globalDiscoveredNodes;
     }
 
+    private string GetCleanVersionString(string rawVersion)
+    {
+        string version = rawVersion;
+        if (version.Contains("-")) version = version.Split('-')[1].Trim();
+        if (version.Contains("–")) version = version.Split('–')[1].Trim();
+        return version;
+    }
+
     private async Task<List<SoftwareReleaseNode>> ProcessSinglePdfUrlTrackAsync(VersionEntryDto target, string categoryName, string productName, string releaseType)
     {
         var fileChunks = new List<SoftwareReleaseNode>();
-
-        // Clean up titles and decouple version keys cleanly
-        string explicitVersion = target.Version;
-        if (explicitVersion.Contains("-")) explicitVersion = explicitVersion.Split('-')[1].Trim();
-        if (explicitVersion.Contains("–")) explicitVersion = explicitVersion.Split('–')[1].Trim();
+        string explicitVersion = GetCleanVersionString(target.Version);
         string fullTitle = $"{productName} – {explicitVersion}";
 
-        // 💡 SCENARIO A: Standalone Ingestion Case (No PDF provided, parse metadata note text directly)
+        // SCENARIO A: Standalone Ingestion Case (No PDF provided)
         if (string.IsNullOrWhiteSpace(target.RelativeUrl))
         {
             if (!string.IsNullOrWhiteSpace(target.Note))
@@ -109,12 +133,12 @@ public class ReleaseNotesScraper : IReleaseNotesScraper
                     ContentChunk = target.Note,
                     RefTickets = string.Empty
                 });
-                Console.WriteLine($"[Scraper Note Sync] Process Processed standalone manifest footnote metadata for: {fullTitle}");
+                Console.WriteLine($"[Scraper Note Sync] Processed standalone manifest footnote metadata for: {fullTitle}");
             }
             return fileChunks;
         }
 
-        // 💡 SCENARIO B: Full Document Download Sequence & Robust Page Processing
+        // SCENARIO B: Full Document Download Sequence
         try
         {
             string safeRelativePath = target.RelativeUrl;
@@ -136,7 +160,6 @@ public class ReleaseNotesScraper : IReleaseNotesScraper
             Console.WriteLine($"[Scraper Network Stream] Requesting [{releaseType}] URI path: {safeRelativePath}");
             byte[] downloadedPdfBytes = await _httpClient.GetByteArrayAsync(safeRelativePath);
             
-            // 💡 OPTIMIZATION: Process page-by-page directly instead of flattening to a single giant string
             using (var memoryStream = new MemoryStream(downloadedPdfBytes))
             using (var document = PdfDocument.Open(memoryStream))
             {
@@ -150,7 +173,6 @@ public class ReleaseNotesScraper : IReleaseNotesScraper
                         continue; 
                     }
 
-                    // Parse this concrete page's text entries safely via the robust page partition system
                     var pageChunks = ChunkSinglePageContent(
                         pageText, 
                         pageNumber,
@@ -181,7 +203,6 @@ public class ReleaseNotesScraper : IReleaseNotesScraper
     private string ExtractTextFromPdfBytes(byte[] pdfBytes)
     {
         var sb = new StringBuilder();
-        
         using (var memoryStream = new MemoryStream(pdfBytes))
         using (var document = PdfDocument.Open(memoryStream))
         {
@@ -190,7 +211,6 @@ public class ReleaseNotesScraper : IReleaseNotesScraper
                 sb.AppendLine(page.Text);
             }
         }
-
         return sb.ToString();
     }
 
@@ -206,8 +226,6 @@ public class ReleaseNotesScraper : IReleaseNotesScraper
         DateTime date)
     {
         var chunks = new List<SoftwareReleaseNode>();
-        
-        // Matches subsection headings on this specific page context
         var sectionRegex = new Regex(@"(?<header>\d+\.\d+\.\d+\s+[A-Za-z0-9\s\(\)\.\-\/]+)\r?\n(?<content>.*?)(?=\d+\.\d+\.\d+\s+[A-Za-z0-9\s\(\)\.\-\/]+|\z)", RegexOptions.Singleline);
         var ticketRegex = new Regex(@"\[(?:FD|J|DO)?-?(\d+)\]", RegexOptions.IgnoreCase);
 
@@ -238,15 +256,12 @@ public class ReleaseNotesScraper : IReleaseNotesScraper
             });
         }
 
-        // 💡 DEFENSIVE FALLBACK PARSER: If a page doesn't match our regex headers, 
-        // partition the raw page text by words to guarantee zero text loss.
         if (!chunks.Any())
         {
             var ticketMatches = ticketRegex.Matches(pageText);
             var ticketsList = ticketMatches.Cast<Match>().Select(m => m.Groups[1].Value.Trim()).Distinct();
             string joinedTickets = string.Join(" ", ticketsList);
 
-            // If the page is relatively short, commit it as a single coherent block
             if (pageText.Length <= 2500)
             {
                 chunks.Add(new SoftwareReleaseNode
@@ -265,7 +280,6 @@ public class ReleaseNotesScraper : IReleaseNotesScraper
             }
             else
             {
-                // If it's a massive page layout data block, split it into 400-word blocks with a 50-word overlap window
                 var words = pageText.Split(new[] { ' ', '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries);
                 int chunkSize = 400;
                 int overlap = 50;
@@ -273,7 +287,7 @@ public class ReleaseNotesScraper : IReleaseNotesScraper
                 for (int i = 0; i < words.Length; i += (chunkSize - overlap))
                 {
                     var chunkWords = words.Skip(i).Take(chunkSize).ToList();
-                    if (chunkWords.Count < 20) break; // Skip tiny dangling sentence remnants
+                    if (chunkWords.Count < 20) break;
 
                     string syntheticChunkText = string.Join(" ", chunkWords);
 
@@ -297,7 +311,6 @@ public class ReleaseNotesScraper : IReleaseNotesScraper
         return chunks;
     }
 
-    // --- Local Strongly-Typed Mapping Data Transfer Objects ---
     private class ReleaseNotesManifestDto { public List<CategoryDto>? Categories { get; set; } }
     private class CategoryDto { public string Name { get; set; } = string.Empty; public List<ProductDto>? Products { get; set; } }
     private class ProductDto 

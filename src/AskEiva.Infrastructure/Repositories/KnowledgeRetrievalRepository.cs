@@ -358,9 +358,11 @@ public async Task BatchIngestReleaseNodesAsync(IEnumerable<SoftwareReleaseNode> 
         Console.WriteLine($"\n[Weaviate Ingestion Engine] Task Finished! Total of {totalIngestedCount} out of {allBatchObjects.Count} records indexed successfully into the cluster.\n");
     }
 
-    public async Task<bool> DoesProductVersionExistAsync(string product, string version)
+public async Task<bool> DoesProductVersionExistAsync(string product, string version)
     {
         var url = "v1/graphql";
+        
+        // 💡 PERFECT MATCHING: Uses a GraphQL structural 'where' operator filtering pass
         var query = new
         {
             query = $$"""
@@ -370,7 +372,7 @@ public async Task BatchIngestReleaseNodesAsync(IEnumerable<SoftwareReleaseNode> 
                   limit: 1
                   where: {
                     operator: And,
-                    concepts: [
+                    operands: [
                       { path: ["product"], operator: Equal, valueText: "{{product}}" },
                       { path: ["version"], operator: Equal, valueText: "{{version}}" }
                     ]
@@ -388,7 +390,7 @@ public async Task BatchIngestReleaseNodesAsync(IEnumerable<SoftwareReleaseNode> 
             var response = await _httpClient.PostAsJsonAsync(url, query);
             if (!response.IsSuccessStatusCode) return false;
 
-            using var doc = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+            using var doc = await JsonDocument.ParseAsync(await response.Content.ReadAsStreamAsync());
             if (doc.RootElement.TryGetProperty("data", out var data) &&
                 data.TryGetProperty("Get", out var get) &&
                 get.TryGetProperty("SoftwareReleaseNode", out var nodesArr) &&
