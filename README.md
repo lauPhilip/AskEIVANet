@@ -1,3 +1,5 @@
+<img width="1024" height="434" alt="image" src="https://github.com/user-attachments/assets/36b9b132-3c56-448d-830f-d063bde788db" />
+
 # 🎓 AskEIVA: Customer Service Agent
 
 [![Funded by: EIVA](https://img.shields.io/badge/Funded%20by-EIVA-0A2540?style=flat-square)](https://www.eiva.com)
