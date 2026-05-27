@@ -34,6 +34,33 @@ string cleanApiKey = weaviateKey.Trim('\"', ' ');
 string cleanMistralKey = mistralKey.Trim('\"', ' ');
 var freshdeskAuthToken = Convert.ToBase64String(Encoding.ASCII.GetBytes($"{apiKey}:X"));
 
+// 💡 NEW CROSS-COMPATIBILITY PROXY GATEWAY: Handles campus firewall SSL decryption layers seamlessly
+// 💡 SECURE ENVIRONMENT DETECTION GATEWAY
+var targetSystemProxy = System.Net.Http.HttpClient.DefaultProxy;
+// Force true if running under your AU work machine domain profile path string
+bool isWorkNetworkActive = (targetSystemProxy != null && targetSystemProxy.GetProxy(new Uri("https://uznwxkhmqa6krcdebigw.c0.europe-west3.gcp.weaviate.cloud/")) != null) 
+                          || AppDomain.CurrentDomain.BaseDirectory.Contains("au667198", StringComparison.OrdinalIgnoreCase);
+
+SocketsHttpHandler GetNetworkHandlerForEnvironment()
+{
+    var handler = new SocketsHttpHandler
+    {
+        Proxy = targetSystemProxy,
+        UseProxy = true
+    };
+
+    // If on the work machine/network, always force-bypass intercepted certificate challenge exceptions
+    if (isWorkNetworkActive)
+    {
+        handler.SslOptions = new System.Net.Security.SslClientAuthenticationOptions
+        {
+            RemoteCertificateValidationCallback = (sender, certificate, chain, sslPolicyErrors) => true
+        };
+    }
+
+    return handler;
+}
+
 // --- 2. SYSTEM CORE SERVICES & BLAZOR ENGINE ---
 builder.Services.AddMudServices();
 builder.Services.AddRazorComponents()
@@ -62,7 +89,8 @@ builder.Services.AddHttpClient<IFreshdeskService, FreshdeskService>(client =>
     client.DefaultRequestHeaders.Accept.Clear();
     client.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
     client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Basic", freshdeskAuthToken);
-});
+})
+.ConfigurePrimaryHttpMessageHandler(() => GetNetworkHandlerForEnvironment());
 
 // Solutions Manual Crawler
 builder.Services.AddHttpClient<IDocumentationCrawler, DocumentationCrawler>(client =>
@@ -71,7 +99,8 @@ builder.Services.AddHttpClient<IDocumentationCrawler, DocumentationCrawler>(clie
     client.DefaultRequestHeaders.Accept.Clear();
     client.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
     client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Basic", freshdeskAuthToken);
-});
+})
+.ConfigurePrimaryHttpMessageHandler(() => GetNetworkHandlerForEnvironment());
 
 // Weaviate Identity User Management
 builder.Services.AddHttpClient<UserRepository>(client =>
@@ -80,7 +109,8 @@ builder.Services.AddHttpClient<UserRepository>(client =>
     client.DefaultRequestHeaders.Clear();
     client.DefaultRequestHeaders.Add("Authorization", $"Bearer {cleanApiKey}");
     client.DefaultRequestHeaders.Add("X-Weaviate-Api-Key", cleanApiKey);
-});
+})
+.ConfigurePrimaryHttpMessageHandler(() => GetNetworkHandlerForEnvironment());
 
 // Automated Weaviate Schema Provisioner Worker Link
 builder.Services.AddHttpClient<WeaviateSchemaProvisioner>(client =>
@@ -89,7 +119,8 @@ builder.Services.AddHttpClient<WeaviateSchemaProvisioner>(client =>
     client.DefaultRequestHeaders.Clear();
     client.DefaultRequestHeaders.Add("Authorization", $"Bearer {cleanApiKey}");
     client.DefaultRequestHeaders.Add("X-Weaviate-Api-Key", cleanApiKey);
-});
+})
+.ConfigurePrimaryHttpMessageHandler(() => GetNetworkHandlerForEnvironment());
 
 // Ticket Repository Client 
 builder.Services.AddHttpClient<ITicketRepository, TicketRepository>(client =>
@@ -98,7 +129,8 @@ builder.Services.AddHttpClient<ITicketRepository, TicketRepository>(client =>
     client.DefaultRequestHeaders.Clear();
     client.DefaultRequestHeaders.Add("Authorization", $"Bearer {cleanApiKey}");
     client.DefaultRequestHeaders.Add("X-Weaviate-Api-Key", cleanApiKey);
-});
+})
+.ConfigurePrimaryHttpMessageHandler(() => GetNetworkHandlerForEnvironment());
 
 // The Software Release Ingestion Scraper Architecture Pipeline
 builder.Services.AddHttpClient<AskEiva.Domain.Services.IReleaseNotesScraper, AskEiva.Infrastructure.Services.ReleaseNotesScraper>(client =>
@@ -115,7 +147,8 @@ builder.Services.AddHttpClient<AskEiva.Domain.Services.IReleaseNotesScraper, Ask
     client.DefaultRequestHeaders.Add("Accept-Language", "en-US,en;q=0.9");
     client.DefaultRequestHeaders.Add("Cache-Control", "no-cache");
     client.DefaultRequestHeaders.Add("Connection", "keep-alive");
-});
+})
+.ConfigurePrimaryHttpMessageHandler(() => GetNetworkHandlerForEnvironment());
 
 // GraphRAG Semantic Relations Repository Client
 builder.Services.AddHttpClient<IGraphRepository, GraphRepository>(client =>
@@ -124,7 +157,8 @@ builder.Services.AddHttpClient<IGraphRepository, GraphRepository>(client =>
     client.DefaultRequestHeaders.Clear();
     client.DefaultRequestHeaders.Add("Authorization", $"Bearer {cleanApiKey}");
     client.DefaultRequestHeaders.Add("X-Weaviate-Api-Key", cleanApiKey);
-});
+})
+.ConfigurePrimaryHttpMessageHandler(() => GetNetworkHandlerForEnvironment());
 
 // Documentation Manuals Repository Client
 builder.Services.AddHttpClient<IDocumentationRepository, DocumentationRepository>(client =>
@@ -133,7 +167,8 @@ builder.Services.AddHttpClient<IDocumentationRepository, DocumentationRepository
     client.DefaultRequestHeaders.Clear();
     client.DefaultRequestHeaders.Add("Authorization", $"Bearer {cleanApiKey}");
     client.DefaultRequestHeaders.Add("X-Weaviate-Api-Key", cleanApiKey);
-});
+})
+.ConfigurePrimaryHttpMessageHandler(() => GetNetworkHandlerForEnvironment());
 
 // Multi-Source Hybrid Retrieval Repository (💡 DUAL AUTH FIXED)
 builder.Services.AddHttpClient<IKnowledgeRetrievalRepository, KnowledgeRetrievalRepository>(client =>
@@ -145,7 +180,8 @@ builder.Services.AddHttpClient<IKnowledgeRetrievalRepository, KnowledgeRetrieval
     
     // 💡 THE CRITICAL FIX: Forwards your Mistral token to Weaviate for on-the-fly embedding text vectorization!
     client.DefaultRequestHeaders.Add("X-Mistral-Api-Key", cleanMistralKey);
-});
+})
+.ConfigurePrimaryHttpMessageHandler(() => GetNetworkHandlerForEnvironment());
 
 // Mistral Conversational Inference Client
 builder.Services.AddHttpClient<IMistralChatService, MistralChatService>(client =>
@@ -153,7 +189,8 @@ builder.Services.AddHttpClient<IMistralChatService, MistralChatService>(client =
     client.BaseAddress = new Uri("https://api.mistral.ai/");
     client.DefaultRequestHeaders.Clear();
     client.DefaultRequestHeaders.Add("Authorization", $"Bearer {cleanMistralKey}");
-});
+})
+.ConfigurePrimaryHttpMessageHandler(() => GetNetworkHandlerForEnvironment());
 
 // Mistral Graph Extraction Engine Client
 builder.Services.AddHttpClient<IExtractionEngine, MistralExtractionEngine>(client =>
@@ -161,7 +198,8 @@ builder.Services.AddHttpClient<IExtractionEngine, MistralExtractionEngine>(clien
     client.BaseAddress = new Uri("https://api.mistral.ai/");
     client.DefaultRequestHeaders.Clear();
     client.DefaultRequestHeaders.Add("Authorization", $"Bearer {cleanMistralKey}");
-});
+})
+.ConfigurePrimaryHttpMessageHandler(() => GetNetworkHandlerForEnvironment());
 
 // --- 4. ASP.NET IDENTITY LIFECYCLE MANAGEMENT BINDINGS ---
 builder.Services.AddScoped<IUserStore<ApplicationUser>, WeaviateUserStore>();
