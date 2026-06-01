@@ -1,13 +1,14 @@
-using System;
-using System.Threading.Tasks;
-using AskEiva.Domain.Services;
-
 namespace AskEiva.Domain.Services;
+
+// A dedicated parameter container to enforce strict, un-swappable types
+public class JiraQueryOptions
+{
+    public string Jql { get; set; } = string.Empty;
+    public int StartAt { get; set; } = 0;
+    public int MaxResults { get; set; } = 100;
+}
 
 public interface IJiraService
 {
-    /// <summary>
-    /// Queries a single batch page of target issues out of Jira using custom JQL syntax parameters.
-    /// </summary>
-    Task<JiraSearchResponse?> GetIssuesPageAsync(string jql, int startAt, int maxResults = 50);
+    Task<JiraSearchResponse?> GetIssuesPageAsync(JiraQueryOptions options);
 }

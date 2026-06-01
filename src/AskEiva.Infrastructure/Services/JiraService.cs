@@ -32,31 +32,41 @@ public class JiraService : IJiraService
         _httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Basic", authToken);
     }
 
-    public async Task<JiraSearchResponse?> GetIssuesPageAsync(string jql, int startAt, int maxResults = 50)
+public async Task<JiraSearchResponse?> GetIssuesPageAsync(JiraQueryOptions options)
     {
-        // Escape complex JQL constraints cleanly so URL parsing characters don't fracture the network request
-        var escapedJql = Uri.EscapeDataString(jql);
+        if (string.IsNullOrWhiteSpace(options.Jql)) return null;
+
+        int safeMax = options.MaxResults > 100 ? 100 : options.MaxResults;
+        var escapedJql = Uri.EscapeDataString(options.Jql);
         
-        // Target the standard multi-field projection block layout parameters recommended for LLM indexing
-        var url = $"search/jql?jql={escapedJql}&startAt={startAt}&maxResults={maxResults}&fields=summary,project,status,issuetype,description,comment";
+        // 💡 FIXED: Rebuilt as a robust, absolute URI query layout string.
+        // This ensures the Atlassian cloud proxy wrapper cannot strip the startAt offset tracking metric!
+        var relativeUrl = $"rest/api/3/search/jql?jql={escapedJql}&startAt={options.StartAt}&maxResults={safeMax}&fields=summary,project,status,issuetype,description,comment";
+        
+        // Combine the configured BaseUrl cleanly with the relative path strings
+        var baseAddressString = _httpClient.BaseAddress?.ToString() ?? _config.BaseUrl;
+        if (!baseAddressString.EndsWith("/")) baseAddressString += "/";
+        
+        var absoluteUrl = new Uri(new Uri(baseAddressString), relativeUrl).ToString();
 
         try
         {
-            var response = await _httpClient.GetAsync(url);
+            // 💡 Print the exact URL to the terminal so we can audit the startAt moving offset live
+            Console.WriteLine($"[Jira Network Outbound] Routing Target URI: {absoluteUrl}");
 
-            // Handle Atlassian rate boundaries natively via recursive backoff loops
+            var response = await _httpClient.GetAsync(absoluteUrl);
+
             if (response.StatusCode == System.Net.HttpStatusCode.TooManyRequests)
             {
                 var retryAfter = response.Headers.RetryAfter?.Delta ?? TimeSpan.FromSeconds(15);
-                Console.WriteLine($"[Jira Guard] Rate limit threshold encountered. Backing off engine for {retryAfter.TotalSeconds}s...");
                 await Task.Delay(retryAfter);
-                return await GetIssuesPageAsync(jql, startAt, maxResults);
+                return await GetIssuesPageAsync(options);
             }
 
             if (!response.IsSuccessStatusCode)
             {
                 string errorBody = await response.Content.ReadAsStringAsync();
-                Console.WriteLine($"[Jira Service API Error] Failed querying block at startAt {startAt}. Status: {response.StatusCode}, Context: {errorBody}");
+                Console.WriteLine($"[Jira Service API Error] Failed querying at startAt {options.StartAt}. Status: {response.StatusCode}, Context: {errorBody}");
                 return null;
             }
 
@@ -64,7 +74,7 @@ public class JiraService : IJiraService
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"[Jira Service Critical Failure] An exception intercepted your request stream: {ex.Message}");
+            Console.WriteLine($"[Jira Service Critical Failure] Request stream fracture: {ex.Message}");
             return null;
         }
     }

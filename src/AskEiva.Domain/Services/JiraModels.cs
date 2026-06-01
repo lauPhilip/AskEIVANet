@@ -89,7 +89,7 @@ public class JiraCommentRawDto
 
     [JsonPropertyName("body")]
     public object? Body { get; set; }
-    
+ 
     [JsonPropertyName("created")]
-    public DateTime Created { get; set; }
-}
+    public string Created { get; set; } = string.Empty;
+    }
