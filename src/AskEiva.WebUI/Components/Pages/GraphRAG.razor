@@ -15,15 +15,15 @@
             
             <MudPaper Elevation="0" Class="pa-4 d-flex align-center justify-space-between" Style="border: 1px solid #E2E8F0; background: #FFFFFF; border-radius: 8px;">
                 <div class="d-flex align-center gap-3">
-                    <MudIcon Icon="@Icons.Material.Filled.Hub" Color="Color.Primary" Size="Size.Medium" />
+                    <MudIcon Icon="@Icons.Material.Filled.Hub" Size="Size.Medium" Style="color:#C5DC22;" />
                     <MudText Typo="Typo.h6" Style="color: #0A2540; font-weight: 600;">Entity Relationship Graph</MudText>
                 </div>
                 <MudButton Variant="Variant.Outlined" 
-                           Color="Color.Primary" 
                            Size="Size.Small" 
                            StartIcon="@Icons.Material.Filled.Refresh" 
                            OnClick="() => LoadGraphDataAsync()"
-                           Disabled="_isGraphLoading">
+                           Disabled="_isGraphLoading"
+                           Style="background-color: #C5DC22;">
                     @(_isGraphLoading ? "Syncing..." : "Refresh Graph")
                 </MudButton>
             </MudPaper>

@@ -513,12 +513,11 @@ else if (!string.IsNullOrWhiteSpace(_jiraDiagnosticStatus))
 
 <div class="d-flex flex-column gap-3">
         <div class="d-flex align-center gap-4">
-            <MudButton Variant="Variant.Filled" 
-                       Color="Color.Secondary" 
+            <MudButton Variant="Variant.Filled"  
                        Disabled="@StateStore.IsProcessing"
                        OnClick="TriggerGlobalContextMeshGeneration"
                        StartIcon="@Icons.Material.Filled.Hub"
-                       Style="font-weight: bold;">
+                       Style="background-color: #C5DC22; font-weight: bold;">
                 @(StateStore.IsProcessing ? "DISTILLING MESH..." : "BUILD DYNAMIC GRAPH")
             </MudButton>
 
@@ -610,10 +609,6 @@ private void ProgressStateStoreChanged()
         StateStore.UpdateProgress(0, 0, "Initialization", "Spawning background context mesh processing core...");
         StateHasChanged();
 
-        // 💡 THE CRITICAL FIX: Run the entire loop inside an independent thread pool worker.
-        // This instantly frees your Blazor interface thread, preventing timeout disconnects!
-// 💡 FIXED: Placing an explicit discard variable tells the compiler: 
-// "Yes, I know this isn't awaited—it's supposed to run in the background!"
     _ = Task.Run(async () =>
 {
     try

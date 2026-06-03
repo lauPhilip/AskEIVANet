@@ -64,35 +64,59 @@
                             @((MarkupString)FormatMessageBody(msg.Text))
                         </div>
                         
-                        @if (msg.SemanticMatches.Any())
+                        @if (!msg.IsUser && (msg.SemanticMatches.Any() || msg.GraphChains.Any()))
                         {
                             <div class="mt-4 pt-3" style="border-top: 1px solid #F1F5F9;">
-                                <MudText Typo="Typo.caption" Class="font-weight-bold d-block mb-2" Style="color: #64748B;">📌 Reference Citations:</MudText>
-                                <div class="overflow-x-auto">
-                                    <table class="eiva-citation-table" style="width: 100%; border-collapse: collapse; font-size: 0.75rem;">
-                                        <thead>
-                                            <tr style="background: #F1F5F9; border-bottom: 2px solid #CBD5E1; color: #475569;">
-                                                <th style="padding: 6px; text-align: left;">Type</th>
-                                                <th style="padding: 6px; text-align: left;">Title / Section Origin</th>
-                                                <th style="padding: 6px; text-align: right;">Proximity Score</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            @foreach (var match in msg.SemanticMatches)
-                                            {
-                                                <tr style="border-bottom: 1px solid #E2E8F0; color: #334155;">
-                                                    <td style="padding: 6px; font-weight: bold;">
-                                                        <span class="type-badge @match.SourceType.ToLower()">@match.SourceType</span>
-                                                    </td>
-                                                    <td style="padding: 6px;">
-                                                        <a href="@match.SourceUrl" target="_blank" style="color: #0284C7; font-weight: 500; text-decoration: none;">@match.Title</a>
-                                                    </td>
-                                                    <td style="padding: 6px; text-align: right; font-family: monospace;">@match.ConfidenceScore.ToString("F4")</td>
-                                                </tr>
-                                            }
-                                        </tbody>
-                                    </table>
-                                </div>
+                                <MudExpansionPanels Elevation="0" Style="background: transparent;">
+                                    <MudExpansionPanel Text="Citations" 
+                                                       Icon="@Icons.Material.Filled.FactCheck"
+                                                       Style="background: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 6px;">
+                                        
+                                        <MudTabs Elevation="0" Rounded="true" ApplyEffectsToInnerViews="true" Color="Color.Primary" Outlined="true" Dense="true">
+                                            
+                                            @* 💡 Tab Panel A: RAG Elements *@
+                                            <MudTabPanel Text="RAG">
+                                                <MudTable Items="msg.SemanticMatches" Dense="true" Hover="true" Elevation="0" Class="mt-2">
+                                                    <HeaderContent>
+                                                        <MudTh>Type</MudTh>
+                                                        <MudTh>Title / Section Origin</MudTh>
+                                                        <MudTh>Proximity Score</MudTh>
+                                                        <MudTh>Content Preview Summary</MudTh>
+                                                    </HeaderContent>
+                                                    <RowTemplate>
+                                                        <MudTd><span class="type-badge @context.SourceType.ToLowerInvariant()">@context.SourceType</span></MudTd>
+                                                        <MudTd Style="font-weight: 500; font-size: 13px;"><a href="@context.SourceUrl" target="_blank" style="color: #0284C7; text-decoration: none;">@context.Title</a></MudTd>
+                                                        <MudTd Style="font-family: monospace;">@context.ConfidenceScore.ToString("F4")</MudTd>
+                                                        <MudTd Style="max-width: 320px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; color: #64748B;">
+                                                            <MudTooltip Text="@context.Content" Placement="Placement.Top">
+                                                                @context.Content
+                                                            </MudTooltip>
+                                                        </MudTd>
+                                                    </RowTemplate>
+                                                </MudTable>
+                                            </MudTabPanel>
+
+                                            @* 💡 Tab Panel B: GraphRAG Paths *@
+                                            <MudTabPanel Text="GraphRAG">
+                                                <MudTable Items="msg.GraphChains" Dense="true" Hover="true" Elevation="0" Class="mt-2">
+                                                    <HeaderContent>
+                                                        <MudTh>Evidence Ref</MudTh>
+                                                        <MudTh>Product Anchor</MudTh>
+                                                        <MudTh>Knowledge Graph Pathway</MudTh>
+                                                        <MudTh>Confidence</MudTh>
+                                                    </HeaderContent>
+                                                    <RowTemplate>
+                                                        <MudTd><MudText Typo="Typo.caption" Style="font-weight: bold; color: #0284C7;">@context.TicketId</MudText></MudTd>
+                                                        <MudTd><MudChip T="string" Variant="Variant.Text" Size="Size.Small" Color="Color.Primary">@context.MainProductContext</MudChip></MudTd>
+                                                        <MudTd Style="font-family: monospace; font-size: 11px; color: #0F172A; background: #F1F5F9; border-radius: 4px; padding: 6px;">@context.SharedPathChain</MudTd>
+                                                        <MudTd><MudChip T="string" Size="Size.Small" Color="Color.Success" Variant="Variant.Outlined">@context.ConfidenceScore%</MudChip></MudTd>
+                                                    </RowTemplate>
+                                                </MudTable>
+                                            </MudTabPanel>
+
+                                        </MudTabs>
+                                    </MudExpansionPanel>
+                                </MudExpansionPanels>
                             </div>
                         }
                     </div>
@@ -134,7 +158,7 @@
 <style>
     .color-active { color: #0A2540 !important; }
     .color-inactive { color: #94A3B8 !important; }
-    .type-badge { display: inline-block; padding: 2px 6px; border-radius: 4px; font-size: 10px; text-transform: uppercase; }
+    .type-badge { display: inline-block; padding: 2px 6px; border-radius: 4px; font-size: 10px; text-transform: uppercase; font-weight: bold; }
     .type-badge.ticket { background: #DCFCE7; color: #15803D; }
     .type-badge.releasenote { background: #E0F2FE; color: #0369A1; }
     .type-badge.documentation { background: #F3E8FF; color: #6B21A8; }
@@ -145,7 +169,6 @@
     private bool _isProcessing = false;
     private string _streamingChunkBuffer = string.Empty;
 
-    // 💡 TOGGLE TRACKING STATES
     private bool _includeTickets = true;
     private bool _includeReleaseNotes = true;
     private bool _includeDocumentation = true;
@@ -180,10 +203,8 @@
 
         try
         {
-            // 1. Fetch raw underlying context structures ranked semantically via Weaviate
             var completeSemanticMatches = await RetrievalRepository.SearchSemanticChunksAsync(userText, limit: 6);
             
-            // 💡 FILTER GATE: Prune returned results according to active checkbox states
             var filteredMatches = completeSemanticMatches.Where(m => 
                 (m.SourceType.Equals("Ticket", StringComparison.OrdinalIgnoreCase) && _includeTickets) ||
                 (m.SourceType.Equals("ReleaseNote", StringComparison.OrdinalIgnoreCase) && _includeReleaseNotes) ||
@@ -192,11 +213,10 @@
 
             responseMessage.SemanticMatches = filteredMatches;
 
-            // 2. Extract structured Entity Triples natively to support GraphRAG context mapping over time
-            var activeGraphTriples = await RetrievalRepository.SearchGraphTriplesAsync(userText, limit: 5);
+            var activeGraphChains = await RetrievalRepository.SearchGraphTriplesAsync(userText, limit: 5);
+            responseMessage.GraphChains = activeGraphChains.ToList();
 
-            // 3. Dispatch streaming context combination down to your Mistral Service
-            await foreach (var chunk in ChatService.GenerateStreamingChatResponseAsync(userText, responseMessage.SemanticMatches, activeGraphTriples, _sessionHistory))
+            await foreach (var chunk in ChatService.GenerateStreamingChatResponseAsync(userText, responseMessage.SemanticMatches, responseMessage.GraphChains, _sessionHistory))
             {
                 _streamingChunkBuffer += chunk;
                 responseMessage.Text = _streamingChunkBuffer;
@@ -207,7 +227,6 @@
             _sessionHistory.Add(new ChatTurn(userText, IsUser: true));
             _sessionHistory.Add(new ChatTurn(_streamingChunkBuffer, IsUser: false));
 
-            // Offload async background task to log operational insights safely
             _ = Task.Run(async () => 
             {
                 try
@@ -267,6 +286,7 @@
         var text = sb.ToString();
 
         text = System.Text.RegularExpressions.Regex.Replace(text, @"\*\*(.*?)\*\*", "<strong>$1</strong>");
+    
         text = System.Text.RegularExpressions.Regex.Replace(text, @"`(.*?)`", "<code style='background: #F1F5F9; padding: 2px 4px; border-radius: 4px; font-family: monospace; color: #DC2626;'>$1</code>");
 
         var tableRegex = new System.Text.RegularExpressions.Regex(@"((?:\|[^|\r\n]*)+\|(?:\r?\n?)+)+");
@@ -309,5 +329,6 @@
         public string Text { get; set; } = string.Empty;
         public bool IsUser { get; set; }
         public List<RetrievalMatch> SemanticMatches { get; set; } = new();
+        public List<GraphContextChain> GraphChains { get; set; } = new();
     }
 }

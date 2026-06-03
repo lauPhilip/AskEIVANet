@@ -15,11 +15,11 @@
         <AuthorizeView>
             <Authorized>
                 <MudLink Href="Account/Manage" Color="Color.Primary" Class="mx-3">@context.User.Identity?.Name</MudLink>
-                <MudButton Href="Account/ForceLogout?returnUrl=%2F" Color="Color.Primary" Variant="Variant.Outlined" Size="Size.Small" Class="mx-2">Logout</MudButton>
+                <MudButton Href="Account/ForceLogout?returnUrl=%2F" Style="Background-color:#C5DC22;" Variant="Variant.Outlined" Size="Size.Small" Class="mx-2">Logout</MudButton>
             </Authorized>
             <NotAuthorized>
                 <MudLink Href="Account/Register" Color="Color.Primary" Class="mx-3 font-weight-bold" Style="align-self: center;">Register</MudLink>
-                <MudButton Href="Account/Login" Color="Color.Primary" Variant="Variant.Filled" Size="Size.Small" Class="mx-2 px-4">Login</MudButton>
+                <MudButton Href="Account/Login"  Style="Background-color:#C5DC22;" Variant="Variant.Filled" Size="Size.Small" Class="mx-2 px-4">Login</MudButton>
             </NotAuthorized>
         </AuthorizeView>
     </MudAppBar>
