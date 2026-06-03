@@ -3,7 +3,8 @@
 @rendermode InteractiveServer
 
 @using MediatR
-@using AskEiva.Application.Graphs.Queries
+@using AskEiva.Application.Graphs.Commands;
+@using AskEiva.Domain.Services;
 @inject IMediator Mediator
 @inject IJSRuntime JSRuntime
 
@@ -86,8 +87,6 @@
 @code {
     private string _graphSearchQuery = string.Empty;
     private bool _isGraphLoading = false;
-    
-    // 💡 NEW: Holds the analytics reference state
     private GraphMetricsDto? _graphMetrics;
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
@@ -98,16 +97,21 @@
         }
     }
 
-    private async Task LoadGraphDataAsync(string filter = "")
+private async Task LoadGraphDataAsync(string filter = "")
     {
         _isGraphLoading = true;
         StateHasChanged();
 
         try
         {
-            var graphData = await Mediator.Send(new GetEntityGraphQuery(filter));
+            // 💡 FIXED: Uses standard property initialization to match our updated record layout!
+            var query = new AskEiva.Application.Graphs.Queries.GetEntityGraphQuery 
+            { 
+                FilterText = filter 
+            };
             
-            // Capture the metrics data packet from the response pipeline
+            var graphData = await Mediator.Send(query);
+            
             _graphMetrics = graphData.Metrics;
 
             await Task.Delay(150);

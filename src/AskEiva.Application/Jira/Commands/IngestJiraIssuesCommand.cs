@@ -11,7 +11,7 @@ using MediatR;
 
 namespace AskEiva.Application.Jira.Commands;
 
-public record IngestJiraIssuesCommand(string JqlFilter = "updated >= '2000-01-01' order by project asc, updated desc") : IRequest<JiraIngestionResult>;
+public record IngestJiraIssuesCommand(string JqlFilter = "updated >= '2000-01-01' order by key asc") : IRequest<JiraIngestionResult>;
 
 public record JiraIngestionResult(bool IsSuccess, int TotalIssuesProcessed, int TotalChunksVectorized, string Message);
 

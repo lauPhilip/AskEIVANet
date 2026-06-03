@@ -138,13 +138,39 @@ builder.Services.AddHttpClient<ITicketRepository, TicketRepository>(client =>
 })
 .ConfigurePrimaryHttpMessageHandler(() => GetNetworkHandlerForEnvironment());
 
+builder.Services.AddSingleton<AskEiva.WebUI.Models.MeshBuildStateStore>();
+
+builder.Services.AddHttpClient<IMistralDistillationService, MistralDistillationService>(client =>
+{
+    client.BaseAddress = new Uri("https://api.mistral.ai/");
+    client.DefaultRequestHeaders.Add("Authorization", $"Bearer {cleanMistralKey}");
+    
+    // 💡 FIXED: Extend the timeout window to 15 minutes for long-running batch ingestion sweeps
+    client.Timeout = TimeSpan.FromMinutes(35); 
+})
+.ConfigurePrimaryHttpMessageHandler(() => GetNetworkHandlerForEnvironment());
+
+builder.Services.AddHttpClient<IGraphRepository, GraphRepository>(client =>
+{
+    client.BaseAddress = new Uri(weaviateUrl);
+    client.DefaultRequestHeaders.Clear();
+    client.DefaultRequestHeaders.Add("Authorization", $"Bearer {cleanApiKey}");
+    client.DefaultRequestHeaders.Add("X-Weaviate-Api-Key", cleanApiKey);
+    client.DefaultRequestHeaders.Add("X-Mistral-Api-Key", cleanMistralKey);
+    
+    // 💡 FIXED: Extend the timeout window here as well
+    client.Timeout = TimeSpan.FromMinutes(35);
+})
+.ConfigurePrimaryHttpMessageHandler(() => GetNetworkHandlerForEnvironment());
+
 // Jira
 // 💡 Bind your secure local user-secrets directly onto your newly consolidated domain configurations object
 builder.Services.Configure<AskEiva.Domain.Services.JiraConfiguration>(
     builder.Configuration.GetSection("JiraConfiguration"));
+    
 
-// 💡 Register the structural HttpClient pipeline assembly loop matching your Clean Architecture design
-builder.Services.AddHttpClient<AskEiva.Domain.Services.IJiraService, AskEiva.Infrastructure.Services.JiraService>();
+// 💡 Register the structural HttpClient pipeline assembly loop matching your Clean Architecture designservices.AddHttpClient<IJiraService, JiraService>();
+builder.Services.AddHttpClient<IJiraService, JiraService>();
 
 // The Software Release Ingestion Scraper Architecture Pipeline
 builder.Services.AddHttpClient<AskEiva.Domain.Services.IReleaseNotesScraper, AskEiva.Infrastructure.Services.ReleaseNotesScraper>(client =>
@@ -161,16 +187,6 @@ builder.Services.AddHttpClient<AskEiva.Domain.Services.IReleaseNotesScraper, Ask
     client.DefaultRequestHeaders.Add("Accept-Language", "en-US,en;q=0.9");
     client.DefaultRequestHeaders.Add("Cache-Control", "no-cache");
     client.DefaultRequestHeaders.Add("Connection", "keep-alive");
-})
-.ConfigurePrimaryHttpMessageHandler(() => GetNetworkHandlerForEnvironment());
-
-// GraphRAG Semantic Relations Repository Client
-builder.Services.AddHttpClient<IGraphRepository, GraphRepository>(client =>
-{
-    client.BaseAddress = new Uri(weaviateUrl);
-    client.DefaultRequestHeaders.Clear();
-    client.DefaultRequestHeaders.Add("Authorization", $"Bearer {cleanApiKey}");
-    client.DefaultRequestHeaders.Add("X-Weaviate-Api-Key", cleanApiKey);
 })
 .ConfigurePrimaryHttpMessageHandler(() => GetNetworkHandlerForEnvironment());
 

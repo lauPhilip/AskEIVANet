@@ -84,7 +84,6 @@
     [CascadingParameter]
     private HttpContext HttpContext { get; set; } = default!;
 
-    // 💡 Declared as nullable to comply with [SupplyParameterFromForm] parameters
     [SupplyParameterFromForm]
     private InputModel? Input { get; set; }
 
@@ -93,22 +92,31 @@
 
     protected override void OnInitialized()
     {
-        // 💡 Lifecycle Initialization: Immediately ensures an instance exists on load
         Input ??= new();
     }
 
+    // 💡 REMOVED: The duplicate 'private HttpContext? HttpContext { get; set; }' definition was deleted from here!
+
     protected override async Task OnInitializedAsync()
     {
-        if (HttpMethods.IsGet(HttpContext.Request.Method))
+        if (HttpContext?.Request != null && HttpMethods.IsGet(HttpContext.Request.Method))
         {
-            // Clear the existing external cookie to ensure a clean local authentication log context
             await HttpContext.SignOutAsync(IdentityConstants.ExternalScheme);
+        }
+
+        if (NavigationManager != null)
+        {
+            var currentUri = NavigationManager.ToAbsoluteUri(NavigationManager.Uri);
+            if (Microsoft.AspNetCore.WebUtilities.QueryHelpers.ParseQuery(currentUri.Query).TryGetValue("ReturnUrl", out var returnUrl))
+            {
+                // 💡 FIXED: Mapped directly to your parameter property 'ReturnUrl' (removed the underscore)
+                ReturnUrl = returnUrl;
+            }
         }
     }
 
     public async Task LoginUser()
     {
-        // 💡 Strict Runtime Defensive Check: Completely blocks execution if data binds as null
         if (Input == null)
         {
             errorMessage = "Error: Internal form processing failure. Please refresh and try again.";
@@ -116,7 +124,6 @@
             return;
         }
 
-        // Safe execution context via our custom Weaviate storage layer
         var result = await SignInManager.PasswordSignInAsync(Input.Email, Input.Password, Input.RememberMe, lockoutOnFailure: false);
         if (result.Succeeded)
         {

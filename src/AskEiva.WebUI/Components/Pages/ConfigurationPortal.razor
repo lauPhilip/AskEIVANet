@@ -8,8 +8,10 @@
 @using AskEiva.Application.Telemetry.Queries
 @using AskEiva.Application.ReleaseNotes.Commands
 @using AskEiva.Application.Tickets.Commands
-@using AskEiva.Domain.Services
+@using AskEiva.Domain.Services;
+@using AskEiva.Application.Graphs.Commands;
 @inject IMediator Mediator
+@inject AskEiva.WebUI.Models.MeshBuildStateStore StateStore
 @inject ISnackbar Snackbar
 @inject ISyncTelemetryBroker TelemetryBroker
 @inject IJiraService JiraService
@@ -387,10 +389,18 @@
 {
     <div class="mt-4 border rounded pa-2 bg-white">
         <MudText Typo="Typo.subtitle2" Class="mb-2 font-weight-bold" Style="color: #0A2540;">
-            🛰️ Live Project Discovery Sample Pool (Showing @_discoveredJiraIssues.Count records across tenant boundaries)
+            🛰️ Live Project Discovery Sample Pool (Showing @_discoveredJiraIssues.Count unique records across tenant boundaries)
         </MudText>
         
-        <MudTable Items="@_discoveredJiraIssues" Dense="true" Hover="true" Bordered="false" Striped="true" Elevation="0" MaxHeight="500px" FixedHeader="true">
+        <MudTable Items="@_discoveredJiraIssues" 
+          Dense="true" 
+          Hover="true" 
+          Bordered="false" 
+          Striped="true" 
+          Elevation="0" 
+          Height="550px" 
+          FixedHeader="true"
+          RowsPerPage="25">
             <HeaderContent>
                 <MudTh /> <MudTh Style="color: #0A2540; font-weight: bold;">Key</MudTh>
                 <MudTh Style="color: #0A2540; font-weight: bold;">Internal ID</MudTh>
@@ -493,6 +503,58 @@ else if (!string.IsNullOrWhiteSpace(_jiraDiagnosticStatus))
         </MudItem>
     </MudGrid>
 
+<MudCard Elevation="0" Style="border: 1px solid #E2E8F0; border-radius: 4px;" Class="pa-6 mt-4">
+    <MudText Typo="Typo.h6" Class="font-weight-bold mb-2" Style="color: #0A2540;">
+        Intelligent Context Mesh Builder
+    </MudText>
+    <MudText Typo="Typo.body2" Class="mb-4" Style="color: #5B7083;">
+        Processes un-distilled Freshdesk ticket nodes, runs multi-collection vector lookaheads, and establishes strongly-typed cross-reference graph edges.
+    </MudText>
+
+<div class="d-flex flex-column gap-3">
+        <div class="d-flex align-center gap-4">
+            <MudButton Variant="Variant.Filled" 
+                       Color="Color.Secondary" 
+                       Disabled="@StateStore.IsProcessing"
+                       OnClick="TriggerGlobalContextMeshGeneration"
+                       StartIcon="@Icons.Material.Filled.Hub"
+                       Style="font-weight: bold;">
+                @(StateStore.IsProcessing ? "DISTILLING MESH..." : "BUILD DYNAMIC GRAPH")
+            </MudButton>
+
+            @if (StateStore.IsProcessing)
+            {
+                <MudProgressCircular Color="Color.Secondary" Size="Size.Small" Indeterminate="true" />
+            }
+        </div>
+
+        @if (StateStore.IsProcessing && StateStore.TotalCount > 0)
+        {
+            <div class="mt-2">
+                <div class="d-flex justify-space-between mb-1">
+                    <MudText Typo="Typo.caption" Style="color: #64748B;">Processing: @StateStore.CurrentCount / @StateStore.TotalCount</MudText>
+                    <MudText Typo="Typo.caption" Class="font-weight-bold" Style="color: #0A2540;">@StateStore.Percentage%</MudText>
+                </div>
+                <MudProgressLinear Color="Color.Secondary" Value="@StateStore.Percentage" Class="my-1" Size="Size.Medium" Striped="true" />
+            </div>
+        }
+    </div>
+
+    @if (StateStore.StatusMessage != "Idle")
+    {
+        <MudText Typo="Typo.body2" Class="mt-3 font-mono" Style="color: #0A2540; background-color: #F8FAFC; padding: 8px; border-radius: 4px;">
+            @StateStore.StatusMessage
+        </MudText>
+    }
+
+    @if (!string.IsNullOrEmpty(_graphMeshStatusMessage))
+    {
+        <MudText Typo="Typo.body2" Class="mt-3 font-mono" Style="color: #0A2540; background-color: #F8FAFC; padding: 8px; border-radius: 4px;">
+            @_graphMeshStatusMessage
+        </MudText>
+    }
+</MudCard>
+
 </MudContainer>
 
 <style>
@@ -525,8 +587,69 @@ else if (!string.IsNullOrWhiteSpace(_jiraDiagnosticStatus))
     {
         TelemetryBroker.OnProgressUpdated += HandleSyncProgressNotification;
         await FetchDashboardTelemetryAsync();
+        StateStore.OnStateChanged += ProgressStateStoreChanged;
+    }
+    private string _graphMeshStatusMessage = string.Empty;
+    
+    // 💡 Track bar telemetry metrics indexes
+    private int _currentTicketIndex = 0;
+    private int _totalTicketsToProcess = 0;
+    private int _calculatedPercentage => _totalTicketsToProcess > 0 ? (int)((double)_currentTicketIndex / _totalTicketsToProcess * 100) : 0;
+
+private void ProgressStateStoreChanged()
+    {
+        // Safely push state changes across Blazor threads to avoid cross-thread UI crashes
+        InvokeAsync(StateHasChanged);
     }
 
+    private async Task TriggerGlobalContextMeshGeneration()
+    {
+        if (StateStore.IsProcessing) return;
+
+        StateStore.IsProcessing = true;
+        StateStore.UpdateProgress(0, 0, "Initialization", "Spawning background context mesh processing core...");
+        StateHasChanged();
+
+        // 💡 THE CRITICAL FIX: Run the entire loop inside an independent thread pool worker.
+        // This instantly frees your Blazor interface thread, preventing timeout disconnects!
+// 💡 FIXED: Placing an explicit discard variable tells the compiler: 
+// "Yes, I know this isn't awaited—it's supposed to run in the background!"
+    _ = Task.Run(async () =>
+{
+    try
+    {
+        var progressReporter = new Progress<AskEiva.Application.Graphs.Commands.GraphProgressReport>(report =>
+        {
+            StateStore.UpdateProgress(report.CurrentCount, report.TotalCount, report.CurrentTicketId, report.Message);
+        });
+
+        var command = new AskEiva.Application.Graphs.Commands.BuildGlobalContextGraphCommand(
+            BatchSize: 8920, 
+            ProgressTracker: progressReporter
+        );
+        
+        var result = await Mediator.Send(command);
+
+        StateStore.UpdateProgress(
+            StateStore.TotalCount, 
+            StateStore.TotalCount, 
+            "Complete", 
+            $"🎉 Processed batch successfully! Added +{result.EdgesCreated} multi-hop context graph paths inside Weaviate."
+        );
+    }
+    catch (Exception ex)
+    {
+        StateStore.UpdateProgress(StateStore.CurrentCount, StateStore.TotalCount, "Error", $"[Pipeline Faulted]: {ex.Message}");
+    }
+    finally
+    {
+        StateStore.IsProcessing = false;
+        await InvokeAsync(StateHasChanged);
+    }
+});
+
+        await Task.CompletedTask;
+    }
     private HashSet<string> _expandedRows = new();
 
     private void OnRowExpandToggled(AskEiva.Domain.Services.JiraIssueRawDto issue)
@@ -546,53 +669,64 @@ private List<AskEiva.Domain.Services.JiraIssueRawDto> _discoveredJiraIssues = ne
 private async Task RunJiraLiveDiagnosticTest()
     {
         _isTestingJira = true;
-        _jiraDiagnosticStatus = "Commencing multi-page organizational discovery sweep...";
+        _jiraDiagnosticStatus = "Commencing sequential numerical pagination sweep...";
         _discoveredJiraIssues.Clear(); 
         _expandedRows.Clear();
         StateHasChanged();
 
-        var queryFilter = "updated >= '2000-01-01' order by project asc, updated desc";
+        // 💡 RESTORED: Switch back to the exact JQL string that successfully pulled data earlier
+        var queryFilter = "updated >= '2000-01-01' order by key asc";
+        
         int currentCursor = 0;
+        int pageSize = 100; 
         bool keepReading = true;
+        int loopSafetyGate = 0;
 
         try
         {
             while (keepReading)
             {
-                _jiraDiagnosticStatus = $"Streaming tenant database registry... Mapped {_discoveredJiraIssues.Count} items so far (API startAt offset: {currentCursor})...";
+                loopSafetyGate++;
+                _jiraDiagnosticStatus = $"Streaming database index logs... Unrolled {_discoveredJiraIssues.Count} unique organization keys (Index: {currentCursor})...";
                 StateHasChanged();
 
                 var options = new AskEiva.Domain.Services.JiraQueryOptions
                 {
                     Jql = queryFilter,
                     StartAt = currentCursor,
-                    MaxResults = 100
+                    MaxResults = pageSize
                 };
 
                 var response = await JiraService.GetIssuesPageAsync(options);
 
                 if (response != null && response.Issues != null && response.Issues.Count > 0)
                 {
-                    _discoveredJiraIssues.AddRange(response.Issues);
-                    
-                    // Advance our pointer tracking location by the exact number of rows swallowed
+                    int freshItemsAddedThisPass = 0;
+
+                    foreach (var issue in response.Issues)
+                    {
+                        if (!_discoveredJiraIssues.Any(x => x.Key == issue.Key))
+                        {
+                            _discoveredJiraIssues.Add(issue);
+                            freshItemsAddedThisPass++;
+                        }
+                    }
+
+                    // Advance the cursor offset pointer
                     currentCursor += response.Issues.Count;
 
-                    // 💡 FIXED: If the page returned fewer than 100 items, we've exhausted the backlog!
-                    // This bypasses the broken 'response.Total == 0' bug entirely.
-                    if (response.Issues.Count < 100)
+                    // Exit the loop if we reach a partial page, hit the bottom, or stop finding unique keys
+                    if (response.Issues.Count < pageSize || freshItemsAddedThisPass == 0 || currentCursor >= response.Total)
                     {
                         keepReading = false;
                     }
                 }
                 else
                 {
-                    // No issues returned on this page layout means we hit the terminal floor
-                    keepReading = false;
+                    keepReading = false; 
                 }
                 
-                // Infinite loop circuit breaker safeguard
-                if (currentCursor > 4000) 
+                if (loopSafetyGate > 40) 
                 {
                     keepReading = false;
                 }
@@ -601,17 +735,17 @@ private async Task RunJiraLiveDiagnosticTest()
             if (_discoveredJiraIssues.Any())
             {
                 _jiraDiagnosticStatus = ""; 
-                Snackbar?.Add($"Success! Discovered {_discoveredJiraIssues.Count} total entries across all active enterprise areas!", Severity.Success);
+                Snackbar?.Add($"Success! Indexed loop processed {_discoveredJiraIssues.Count} records across all active workspaces!", Severity.Success);
             }
             else
             {
-                _jiraDiagnosticStatus = "[200 OK] Handshake successful, but 0 issues were returned.";
+                _jiraDiagnosticStatus = "[200 OK] Loop executed, but database records returned empty. Ensure the date filter is valid.";
             }
         }
         catch (Exception ex)
         {
-            _jiraDiagnosticStatus = $"[System Exception Intercepted] Cross-project pagination broke down: {ex.Message}";
-            Snackbar?.Add("Connection pipeline encountered an error.", Severity.Error);
+            _jiraDiagnosticStatus = $"[System Exception Intercepted] Index loop failed: {ex.Message}";
+            Snackbar?.Add("Connection pipeline encountered an index tracking error.", Severity.Error);
         }
         finally
         {
@@ -754,6 +888,7 @@ private async Task RunJiraLiveDiagnosticTest()
 
     public void Dispose()
     {
-        TelemetryBroker.OnProgressUpdated += HandleSyncProgressNotification;
+        TelemetryBroker.OnProgressUpdated -= HandleSyncProgressNotification;
+        StateStore.OnStateChanged -= ProgressStateStoreChanged;
     }
 }

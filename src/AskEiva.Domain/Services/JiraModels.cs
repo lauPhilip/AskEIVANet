@@ -1,4 +1,3 @@
-using System;
 using System.Collections.Generic;
 using System.Text.Json.Serialization;
 
@@ -6,29 +5,20 @@ namespace AskEiva.Domain.Services;
 
 public class JiraSearchResponse
 {
-    [JsonPropertyName("startAt")]
-    public int StartAt { get; set; }
-
-    [JsonPropertyName("maxResults")]
-    public int MaxResults { get; set; }
+    [JsonPropertyName("issues")]
+    public List<JiraIssueRawDto> Issues { get; set; } = new();
 
     [JsonPropertyName("total")]
     public int Total { get; set; }
-
-    [JsonPropertyName("issues")]
-    public List<JiraIssueRawDto> Issues { get; set; } = new();
 }
 
 public class JiraIssueRawDto
 {
-    [JsonPropertyName("id")]
-    public string Id { get; set; } = string.Empty;
-
     [JsonPropertyName("key")]
     public string Key { get; set; } = string.Empty;
 
-    [JsonPropertyName("self")]
-    public string Self { get; set; } = string.Empty;
+    [JsonPropertyName("id")]
+    public string Id { get; set; } = string.Empty;
 
     [JsonPropertyName("fields")]
     public JiraFieldsRawDto Fields { get; set; } = new();
@@ -39,23 +29,25 @@ public class JiraFieldsRawDto
     [JsonPropertyName("summary")]
     public string Summary { get; set; } = string.Empty;
 
-    [JsonPropertyName("project")]
-    public JiraProjectRawDto Project { get; set; } = new();
-
-    [JsonPropertyName("status")]
-    public JiraStatusRawDto Status { get; set; } = new();
-
-    [JsonPropertyName("issuetype")]
-    public JiraIssueTypeRawDto IssueType { get; set; } = new();
-
+    // 💡 FIXED: Changed from string? to object?. 
+    // This stops Jira's complex Atlassian Document Format (ADF) JSON graph from breaking the deserializer threshold!
     [JsonPropertyName("description")]
     public object? Description { get; set; }
 
+    [JsonPropertyName("project")]
+    public JiraProjectDto? Project { get; set; }
+
+    [JsonPropertyName("issuetype")]
+    public JiraIssueTypeDto? IssueType { get; set; }
+
+    [JsonPropertyName("status")]
+    public JiraStatusDto? Status { get; set; }
+
     [JsonPropertyName("comment")]
-    public JiraCommentResponseRawDto? CommentCollection { get; set; }
+    public JiraCommentCollectionDto? CommentCollection { get; set; }
 }
 
-public class JiraProjectRawDto
+public class JiraProjectDto
 {
     [JsonPropertyName("key")]
     public string Key { get; set; } = string.Empty;
@@ -64,32 +56,33 @@ public class JiraProjectRawDto
     public string Name { get; set; } = string.Empty;
 }
 
-public class JiraStatusRawDto
+public class JiraIssueTypeDto
 {
     [JsonPropertyName("name")]
     public string Name { get; set; } = string.Empty;
 }
 
-public class JiraIssueTypeRawDto
+public class JiraStatusDto
 {
     [JsonPropertyName("name")]
     public string Name { get; set; } = string.Empty;
 }
 
-public class JiraCommentResponseRawDto
+public class JiraCommentCollectionDto
 {
     [JsonPropertyName("comments")]
-    public List<JiraCommentRawDto> Comments { get; set; } = new();
+    public List<JiraCommentDto> Comments { get; set; } = new();
 }
 
-public class JiraCommentRawDto
+public class JiraCommentDto
 {
     [JsonPropertyName("id")]
     public string Id { get; set; } = string.Empty;
 
+    // 💡 FIXED: Comments also leverage the ADF complex structural format in v3
     [JsonPropertyName("body")]
     public object? Body { get; set; }
- 
+
     [JsonPropertyName("created")]
     public string Created { get; set; } = string.Empty;
-    }
+}

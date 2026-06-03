@@ -458,4 +458,88 @@ public async Task<bool> DoesProductVersionExistAsync(string product, string vers
         catch { }
         return false;
     }
+
+public async Task<List<TechnicalContextSearchResult>> SearchTechnicalContextAsync(string ticketId, int maxResults)
+    {
+        var results = new List<TechnicalContextSearchResult>();
+
+        try
+        {
+            // 💡 FIXED: Using Weaviate's nearObject filter to execute cross-collection lookups 
+            // using the ticket's server-side vector reference!
+            var graphQlQuery = $$"""
+            {
+              Get {
+                DocumentLibrary(
+                  nearObject: { id: "{{ticketId}}" }
+                  limit: {{maxResults}}
+                ) {
+                  _additional { id }
+                  content
+                }
+                SoftwareReleaseNode(
+                  nearObject: { id: "{{ticketId}}" }
+                  limit: {{maxResults}}
+                ) {
+                  _additional { id }
+                  content_chunk
+                }
+              }
+            }
+            """;
+
+            var requestPayload = new { query = graphQlQuery };
+            var response = await _httpClient.PostAsJsonAsync("v1/graphql", requestPayload);
+            
+            if (!response.IsSuccessStatusCode)
+            {
+                Console.WriteLine($"[Weaviate HTTP Failure] GraphQL returned status: {response.StatusCode}");
+                return results;
+            }
+
+            using var jsonDocument = await JsonDocument.ParseAsync(await response.Content.ReadAsStreamAsync());
+            var root = jsonDocument.RootElement;
+
+            if (root.TryGetProperty("data", out var dataNode) && dataNode.TryGetProperty("Get", out var getCollection))
+            {
+                // Map elements pulled from DocumentLibrary
+                if (getCollection.TryGetProperty("DocumentLibrary", out var docArray) && docArray.ValueKind == JsonValueKind.Array)
+                {
+                    foreach (var elem in docArray.EnumerateArray())
+                    {
+                        string idStr = elem.GetProperty("_additional").GetProperty("id").GetString() ?? Guid.NewGuid().ToString();
+                        results.Add(new TechnicalContextSearchResult
+                        {
+                            Id = Guid.Parse(idStr),
+                            Content = elem.GetProperty("content").GetString() ?? string.Empty,
+                            CollectionName = "DocumentLibrary",
+                            SuggestedEdgeType = "EXPLAINS_FEATURE"
+                        });
+                    }
+                }
+
+                // Map elements pulled from SoftwareReleaseNode
+                if (getCollection.TryGetProperty("SoftwareReleaseNode", out var releaseArray) && releaseArray.ValueKind == JsonValueKind.Array)
+                {
+                    foreach (var elem in releaseArray.EnumerateArray())
+                    {
+                        string idStr = elem.GetProperty("_additional").GetProperty("id").GetString() ?? Guid.NewGuid().ToString();
+                        results.Add(new TechnicalContextSearchResult
+                        {
+                            Id = Guid.Parse(idStr),
+                            Content = elem.GetProperty("content_chunk").GetString() ?? string.Empty,
+                            CollectionName = "SoftwareReleaseNode",
+                            SuggestedEdgeType = "ACCUSES_BUG"
+                        });
+                    }
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[Infrastructure Graph Search Failure] Direct HTTP stream faulted: {ex.Message}");
+        }
+
+        return results.OrderBy(x => Guid.NewGuid()).Take(maxResults).ToList();
+    }
 }

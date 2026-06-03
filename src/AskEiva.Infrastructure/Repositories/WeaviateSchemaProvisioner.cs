@@ -99,12 +99,68 @@ namespace AskEiva.Infrastructure.Repositories
 
                 await EnsureKnowledgeNodeClassAsync();
                 await EnsureJiraSchemaAsync();
+                await EnsureGraphContextChainClassAsync();
             }
             catch (Exception ex)
             {
                 _logger.LogCritical(ex, "An unhandled exception collapsed the global schema configuration loop.");
             }
         }
+private async Task EnsureGraphContextChainClassAsync()
+    {
+        var checkUrl = "v1/schema/GraphContextChain";
+        var createUrl = "v1/schema";
+
+        try
+        {
+            var response = await _httpClient.GetAsync(checkUrl);
+            if (response.IsSuccessStatusCode)
+            {
+                Console.WriteLine("[Weaviate Provisioner] Class 'GraphContextChain' verified.");
+                return;
+            }
+
+            // 💡 NEW: Define the structural schema blueprint for the text-graph scenario paths
+            var chainSchema = new
+            {
+                @class = "GraphContextChain",
+                description = "Stores multi-hop context paths linking customer tickets directly to technical scenarios and software updates text spans.",
+                vectorizer = "text2vec-mistral", // Automatically vectors your text chains
+                moduleConfig = new
+                {
+                    @text2vec_mistral = new
+                    {
+                        model = "mistral-embed",
+                        type = "text"
+                    }
+                },
+                vectorIndexConfig = new
+                {
+                    distance = "cosine"
+                },
+                properties = new object[]
+                {
+                    new { name = "ticket_id", dataType = new[] { "text" }, tokenization = "word", description = "The domain ticket ID tracker asset key (e.g. FD-82022)." },
+                    new { name = "ticket_title", dataType = new[] { "text" }, tokenization = "word", description = "The explicit or derived anchor title of the support query context." },
+                    new { name = "main_product_context", dataType = new[] { "text" }, tokenization = "field", description = "The primary EIVA software product affected (e.g. NaviPac)." },
+                    new { name = "scenario_type", dataType = new[] { "text" }, tokenization = "field", description = "The mapped routing classification type category." },
+                    new { name = "shared_path_chain", dataType = new[] { "text" }, tokenization = "word", description = "The raw complete text-based continuous multi-hop string sequence path." },
+                    new { name = "predicates", dataType = new[] { "text[]" }, description = "List of relationship tokens tracking the connection sequence steps." },
+                    new { name = "environmental_context_summary", dataType = new[] { "text" }, tokenization = "word", description = "Enriched text summary mapping intersecting ecosystem settings, versions, or conditions." },
+                    new { name = "confidence_score", dataType = new[] { "int" }, description = "Calculated link probability confidence scalar metric multiplied by 100." }
+                }
+            };
+
+            Console.WriteLine("[Weaviate Provisioner] Provisioning new multi-hop text chain collection schema class: GraphContextChain...");
+            var createResponse = await _httpClient.PostAsJsonAsync(createUrl, chainSchema);
+            createResponse.EnsureSuccessStatusCode();
+            Console.WriteLine("[Weaviate Provisioner] Class 'GraphContextChain' successfully provisioned on remote cluster endpoints.");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[Weaviate Provisioner Critical Exception - GraphContextChain]: {ex.Message}");
+        }
+    }
 
         private async Task EnsureJiraSchemaAsync()
     {

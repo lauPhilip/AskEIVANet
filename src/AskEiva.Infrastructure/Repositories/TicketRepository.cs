@@ -59,6 +59,121 @@ public class TicketRepository : ITicketRepository
         }
     }
 
+public async Task<List<TicketNode>> GetUnprocessedTicketHeadersAsync(int batchSize)
+{
+    var headers = new List<TicketNode>();
+
+    try
+    {
+        // 💡 ADVANCED GRAPHQL: Group chunks by source_id where processing is still required
+        var graphQlQuery = $$"""
+        {
+          Get {
+            KnowledgeNode(
+              where: {
+                path: ["is_distilled"]
+                operator: Equal
+                valueBoolean: false
+              }
+              limit: {{batchSize * 5}}
+            ) {
+              source_id
+              subject
+            }
+          }
+        }
+        """;
+
+        var response = await _httpClient.PostAsJsonAsync("v1/graphql", new { query = graphQlQuery });
+        if (!response.IsSuccessStatusCode) return headers;
+
+        using var jsonDocument = await JsonDocument.ParseAsync(await response.Content.ReadAsStreamAsync());
+        var root = jsonDocument.RootElement;
+
+        if (root.TryGetProperty("data", out var dataNode) && 
+            dataNode.TryGetProperty("Get", out var getCollection) &&
+            getCollection.TryGetProperty("KnowledgeNode", out var chunkArray) &&
+            chunkArray.ValueKind == JsonValueKind.Array)
+        {
+            // Use an internal hashset tracking collection to unique-filter the matching headers up to the requested batch size limit
+            var uniqueIds = new HashSet<string>();
+
+            foreach (var elem in chunkArray.EnumerateArray())
+            {
+                if (headers.Count >= batchSize) break;
+
+                string sourceId = elem.TryGetProperty("source_id", out var idProp) ? idProp.GetString() ?? string.Empty : string.Empty;
+                if (string.IsNullOrEmpty(sourceId) || uniqueIds.Contains(sourceId)) continue;
+
+                string subject = elem.TryGetProperty("subject", out var subProp) ? subProp.GetString() ?? "Support Thread Context" : "Support Thread Context";
+
+                uniqueIds.Add(sourceId);
+                headers.Add(new TicketNode
+                {
+                    SourceId = sourceId,
+                    Content = string.Empty // Kept empty intentionally; will be populated by the stitcher method!
+                });
+            }
+        }
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine($"[Infrastructure Ingestion Header Sweep Fault]: {ex.Message}");
+    }
+
+    return headers;
+}
+    public async Task<string> GetStitchedTicketContentAsync(string sourceId)
+{
+    try
+    {
+        // Query Weaviate for all chunks sharing the targeted source tracking ID
+        var graphQlQuery = $$"""
+        {
+          Get {
+            KnowledgeNode(
+              where: {
+                path: ["source_id"]
+                operator: Equal
+                valueText: "{{sourceId}}"
+              }
+            ) {
+              content
+            }
+          }
+        }
+        """;
+
+        var response = await _httpClient.PostAsJsonAsync("v1/graphql", new { query = graphQlQuery });
+        if (!response.IsSuccessStatusCode) return string.Empty;
+
+        using var jsonDocument = await JsonDocument.ParseAsync(await response.Content.ReadAsStreamAsync());
+        var root = jsonDocument.RootElement;
+
+        if (root.TryGetProperty("data", out var dataNode) && 
+            dataNode.TryGetProperty("Get", out var getCollection) &&
+            getCollection.TryGetProperty("KnowledgeNode", out var chunkArray) && 
+            chunkArray.ValueKind == JsonValueKind.Array)
+        {
+            var stringBuilder = new System.Text.StringBuilder();
+            foreach (var chunk in chunkArray.EnumerateArray())
+            {
+                if (chunk.TryGetProperty("content", out var contentElement))
+                {
+                    stringBuilder.AppendLine(contentElement.GetString());
+                }
+            }
+            return stringBuilder.ToString();
+        }
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine($"[Ticket Reassembly Failure]: {ex.Message}");
+    }
+
+    return string.Empty;
+}
+
     public async Task<IEnumerable<TicketNode>> GetUnprocessedTicketsAsync(int limit)
     {
         var url = "v1/graphql";

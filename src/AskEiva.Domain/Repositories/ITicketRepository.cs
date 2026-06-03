@@ -11,4 +11,6 @@ public interface ITicketRepository
     Task MarkAsDistilledAsync(string sourceId);
     Task<bool> DoesTicketExistAsync(string sourceId);
     Task BatchIngestTicketNodesAsync(IEnumerable<TicketNode> tickets); 
+    Task<List<TicketNode>> GetUnprocessedTicketHeadersAsync(int batchSize);
+    Task<string> GetStitchedTicketContentAsync(string sourceId);
 }
