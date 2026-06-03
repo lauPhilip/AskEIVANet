@@ -5,6 +5,7 @@
 @using MediatR
 @using AskEiva.Application.Graphs.Commands;
 @using AskEiva.Domain.Services;
+@using AskEiva.Application.Graphs.Queries; 
 @inject IMediator Mediator
 @inject IJSRuntime JSRuntime
 
@@ -97,23 +98,21 @@
         }
     }
 
-private async Task LoadGraphDataAsync(string filter = "")
+    private async Task LoadGraphDataAsync(string filter = "")
     {
         _isGraphLoading = true;
         StateHasChanged();
 
         try
         {
-            // 💡 FIXED: Uses standard property initialization to match our updated record layout!
-            var query = new AskEiva.Application.Graphs.Queries.GetEntityGraphQuery 
-            { 
-                FilterText = filter 
-            };
+            var query = new GetEntityGraphQuery { FilterText = filter };
             
-            var graphData = await Mediator.Send(query);
+            // Explicitly scoped typing to link your query returns flawlessly
+            GraphNetworkQueryResult graphData = await Mediator.Send(query);
             
             _graphMetrics = graphData.Metrics;
 
+            // Brief delay to let the viewport DOM register before forcing JS layout injections
             await Task.Delay(150);
             await JSRuntime.InvokeVoidAsync("window.eivaGraphInterop.renderNetworkGraph", "eivaGraphViewport", graphData.Nodes, graphData.Edges);
         }

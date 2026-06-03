@@ -3,6 +3,8 @@ using System.Threading.Tasks;
 using AskEiva.Domain.ValueObjects;
 using AskEiva.Domain.Entities;
 using AskEiva.Domain.Services;
+using System.Text.Json;
+using System.Threading.Tasks;
 
 namespace AskEiva.Domain.Repositories;
 
@@ -10,6 +12,7 @@ public interface IKnowledgeRetrievalRepository
 {
     Task<IEnumerable<RetrievalMatch>> SearchSemanticChunksAsync(string userQuery, int limit);
     Task<IEnumerable<GraphContextChain>> SearchGraphTriplesAsync(string userQuery, int limit);
+    Task<JsonElement> FetchRawGraphMeshJsonAsync(string filterText);
     Task<int> GetTotalClassCountAsync(string className);
     Task<int> GetDistinctSourceCountAsync(string className, string groupProperty);
     Task<System.Text.Json.JsonElement> GetRawInteractionLogsAsync(int limit);

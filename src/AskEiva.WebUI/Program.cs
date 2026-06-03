@@ -200,6 +200,19 @@ builder.Services.AddHttpClient<IDocumentationRepository, DocumentationRepository
 })
 .ConfigurePrimaryHttpMessageHandler(() => GetNetworkHandlerForEnvironment());
 
+builder.Services.AddHttpClient<AskEiva.Application.Graphs.Queries.GetEntityGraphQueryHandler>(client =>
+{
+    client.BaseAddress = new Uri(weaviateUrl);
+    client.DefaultRequestHeaders.Clear();
+    client.DefaultRequestHeaders.Add("Authorization", $"Bearer {cleanApiKey}");
+    client.DefaultRequestHeaders.Add("X-Weaviate-Api-Key", cleanApiKey);
+    
+    // 💡 THE CRITICAL FIX: Forwards your Mistral token to Weaviate for on-the-fly embedding text vectorization!
+    client.DefaultRequestHeaders.Add("X-Mistral-Api-Key", cleanMistralKey);
+})
+.ConfigurePrimaryHttpMessageHandler(() => GetNetworkHandlerForEnvironment());
+
+
 // Multi-Source Hybrid Retrieval Repository (💡 DUAL AUTH FIXED)
 builder.Services.AddHttpClient<IKnowledgeRetrievalRepository, KnowledgeRetrievalRepository>(client =>
 {

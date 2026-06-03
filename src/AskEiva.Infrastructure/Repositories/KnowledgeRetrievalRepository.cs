@@ -148,6 +148,46 @@ public class KnowledgeRetrievalRepository : IKnowledgeRetrievalRepository
         }
     }
 
+    public async Task<JsonElement> FetchRawGraphMeshJsonAsync(string filterText)
+{
+    var url = "v1/graphql";
+    
+    string graphQlFilterBlock = string.IsNullOrWhiteSpace(filterText) 
+        ? "limit: 45" 
+        : "limit: 45, hybrid: { query: \"" + filterText + "\", alpha: 0.4 }";
+
+    var query = new
+    {
+        query = $$"""
+        {
+          Get {
+            GraphContextChain({{graphQlFilterBlock}}) {
+              ticket_id
+              main_product_context
+              scenario_type
+              predicates
+              confidence_score
+            }
+          }
+        }
+        """
+    };
+
+    try
+    {
+        // 💡 Uses the repository's native, perfectly authorized client channel
+        var response = await _httpClient.PostAsJsonAsync(url, query);
+        if (!response.IsSuccessStatusCode) return default;
+
+        using var doc = await JsonDocument.ParseAsync(await response.Content.ReadAsStreamAsync());
+        return doc.RootElement.Clone();
+    }
+    catch
+    {
+        return default;
+    }
+}
+
 public async Task<IEnumerable<GraphContextChain>> SearchGraphTriplesAsync(string userQuery, int limit)
     {
         var url = "v1/graphql";
