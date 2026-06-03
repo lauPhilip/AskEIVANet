@@ -19,13 +19,13 @@ public class MistralChatService : IMistralChatService
         _httpClient = httpClient;
     }
 
-    public async IAsyncEnumerable<string> GenerateStreamingChatResponseAsync(
+public async IAsyncEnumerable<string> GenerateStreamingChatResponseAsync(
         string userQuestion, 
         IEnumerable<RetrievalMatch> semanticContext, 
-        IEnumerable<KnowledgeTriple> structuralGraph,
+        IEnumerable<GraphContextChain> structuralGraphMashes,
         IEnumerable<ChatTurn> conversationHistory)
     {
-        // 1. Compile your standard vector retrieval contexts
+        // 1. Compile standard text fragments
         var contextBuilder = new StringBuilder();
         contextBuilder.AppendLine("=== RETRIEVED REFERENCE CONTEXT ===");
         foreach (var match in semanticContext)
@@ -33,16 +33,28 @@ public class MistralChatService : IMistralChatService
             contextBuilder.AppendLine($"[{match.SourceType}] Title: {match.Title}\nContent: {match.Content}\n---");
         }
 
-        // 2. Build the message array dynamically to include historical context
-        var messagesList = new List<object>();
+        // 2. 💡 NEW: Inject your distilled multi-hop graph path relationships seamlessly
+        if (structuralGraphMashes != null && structuralGraphMashes.Any())
+        {
+            contextBuilder.AppendLine("\n=== RETRIEVED HISTORICAL WORKSPACE GRAPH-MESH SCENARIOS ===");
+            foreach (var mesh in structuralGraphMashes)
+            {
+                contextBuilder.AppendLine($"[Support Reference Path: #{mesh.TicketId} | System Context: {mesh.MainProductContext} ({mesh.ScenarioType})]");
+                contextBuilder.AppendLine($"Environment Conditions: {mesh.EnvironmentalContextSummary}");
+                contextBuilder.AppendLine($"Causal Knowledge Path Traversal Chain: {mesh.SharedPathChain}");
+                contextBuilder.AppendLine($"Graph Verification Confidence: {mesh.ConfidenceScore}%");
+                contextBuilder.AppendLine("---");
+            }
+        }
 
-        // System instructions remain locked at position zero
-        messagesList.Add(new { 
-            role = "system", 
-            content = "You are AskEIVA, an expert automated customer support engineer. Synthesize the provided support tickets, technical documentation, and conversation history to answer questions. Format outputs using Markdown and Markdown tables where appropriate." 
-        });
+        var messagesList = new List<object>
+        {
+            new { 
+                role = "system", 
+                content = "You are AskEIVA, an expert automated customer support engineer. Synthesize the provided support tickets, technical documentation, release manifests, and historical knowledge graph context paths to answer questions. Format outputs using clear Markdown syntax." 
+            }
+        };
 
-        // Loop through and append rolling history turns chronologically
         foreach (var turn in conversationHistory)
         {
             messagesList.Add(new { 
@@ -51,10 +63,9 @@ public class MistralChatService : IMistralChatService
             });
         }
 
-        // Finally, add the current query accompanied by the freshly harvested Weaviate data vectors
         messagesList.Add(new { 
             role = "user", 
-            content = $"Context Data:\n{contextBuilder}\n\nNew User Question: {userQuestion}" 
+            content = $"Context Data Elements:\n{contextBuilder}\n\nNew User Question: {userQuestion}" 
         });
 
         var payload = new
@@ -71,7 +82,6 @@ public class MistralChatService : IMistralChatService
         };
 
         using var response = await _httpClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead);
-        
         if (!response.IsSuccessStatusCode)
         {
             yield return $"Mistral Stream Failure: {response.StatusCode}";

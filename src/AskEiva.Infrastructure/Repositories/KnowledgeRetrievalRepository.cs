@@ -148,7 +148,7 @@ public class KnowledgeRetrievalRepository : IKnowledgeRetrievalRepository
         }
     }
 
-    public async Task<IEnumerable<KnowledgeTriple>> SearchGraphTriplesAsync(string userQuery, int limit)
+public async Task<IEnumerable<GraphContextChain>> SearchGraphTriplesAsync(string userQuery, int limit)
     {
         var url = "v1/graphql";
         var query = new
@@ -156,14 +156,18 @@ public class KnowledgeRetrievalRepository : IKnowledgeRetrievalRepository
             query = $$"""
             {
               Get {
-                EntityGraph(
+                GraphContextChain(
                   limit: {{limit}}
-                  hybrid: { query: "{{userQuery}}", alpha: 0.3 }
+                  hybrid: { query: "{{userQuery}}", alpha: 0.5 }
                 ) {
-                  subject
-                  predicate
-                  object
-                  evidence_id
+                  ticket_id
+                  ticket_title
+                  main_product_context
+                  scenario_type
+                  shared_path_chain
+                  predicates
+                  environmental_context_summary
+                  confidence_score
                 }
               }
             }
@@ -173,31 +177,41 @@ public class KnowledgeRetrievalRepository : IKnowledgeRetrievalRepository
         try
         {
             var response = await _httpClient.PostAsync(url, new StringContent(JsonSerializer.Serialize(query), Encoding.UTF8, "application/json"));
-            if (!response.IsSuccessStatusCode) return Enumerable.Empty<KnowledgeTriple>();
+            if (!response.IsSuccessStatusCode) return Enumerable.Empty<GraphContextChain>();
 
             using var doc = await JsonDocument.ParseAsync(await response.Content.ReadAsStreamAsync());
-            var triples = new List<KnowledgeTriple>();
+            var meshes = new List<GraphContextChain>();
 
             if (doc.RootElement.TryGetProperty("data", out var data) &&
                 data.TryGetProperty("Get", out var get) &&
-                get.TryGetProperty("EntityGraph", out var nodes))
+                get.TryGetProperty("GraphContextChain", out var nodes))
             {
                 foreach (var node in nodes.EnumerateArray())
                 {
-                    triples.Add(new KnowledgeTriple
+                    var predicatesList = new List<string>();
+                    if (node.TryGetProperty("predicates", out var predProp) && predProp.ValueKind == JsonValueKind.Array)
                     {
-                        Subject = node.GetProperty("subject").GetString() ?? string.Empty,
-                        Predicate = node.GetProperty("predicate").GetString() ?? string.Empty,
-                        Object = node.GetProperty("object").GetString() ?? string.Empty,
-                        SourceTicketId = node.GetProperty("evidence_id").GetString() ?? string.Empty
+                        predicatesList = predProp.EnumerateArray().Select(p => p.GetString() ?? string.Empty).ToList();
+                    }
+
+                    meshes.Add(new GraphContextChain
+                    {
+                        TicketId = node.GetProperty("ticket_id").GetString() ?? string.Empty,
+                        TicketTitle = node.GetProperty("ticket_title").GetString() ?? string.Empty,
+                        MainProductContext = node.GetProperty("main_product_context").GetString() ?? string.Empty,
+                        ScenarioType = node.GetProperty("scenario_type").GetString() ?? string.Empty,
+                        SharedPathChain = node.GetProperty("shared_path_chain").GetString() ?? string.Empty,
+                        Predicates = predicatesList,
+                        EnvironmentalContextSummary = node.GetProperty("environmental_context_summary").GetString() ?? string.Empty,
+                        ConfidenceScore = node.GetProperty("confidence_score").GetInt32()
                     });
                 }
             }
-            return triples;
+            return meshes;
         }
         catch
         {
-            return Enumerable.Empty<KnowledgeTriple>();
+            return Enumerable.Empty<GraphContextChain>();
         }
     }
 

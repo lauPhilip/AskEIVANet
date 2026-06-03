@@ -10,11 +10,12 @@ using MediatR;
 
 namespace AskEiva.Application.Knowledge.Queries;
 
+// 💡 RECORD TYPING UPDATE
 public record SearchKnowledgeQuery(string UserQuestion, int MaxResults) : IRequest<SearchQueryResult>;
 
 public record SearchQueryResult(
     List<RetrievalMatch> SemanticMatches,
-    List<KnowledgeTriple> RelevantGraphRelations,
+    List<GraphContextChain> RelevantGraphRelations, 
     string SearchQuery,
     IAsyncEnumerable<string> AnswerStream
 );
@@ -39,26 +40,24 @@ public class SearchKnowledgeQueryHandler : IRequestHandler<SearchKnowledgeQuery,
             return new SearchQueryResult(new(), new(), string.Empty, EmptyStream());
         }
 
-        // 1. Concurrent sweep across your Weaviate storage nodes
         var semanticTask = _retrievalRepository.SearchSemanticChunksAsync(request.UserQuestion, request.MaxResults);
         var graphTask = _retrievalRepository.SearchGraphTriplesAsync(request.UserQuestion, request.MaxResults);
 
         await Task.WhenAll(semanticTask, graphTask);
 
         var semanticMatches = semanticTask.Result.ToList();
-        var graphTriples = graphTask.Result.ToList();
+        var graphChains = graphTask.Result.ToList(); // 💡 Stored as native GraphContextChain sequences
 
-        // 2. Pass back the live asynchronous stream handler instead of a blocking string
         var stream = _chatService.GenerateStreamingChatResponseAsync(
             request.UserQuestion, 
             semanticMatches, 
-            graphTriples,
+            graphChains,
             System.Linq.Enumerable.Empty<ChatTurn>()
         );
 
         return new SearchQueryResult(
             SemanticMatches: semanticMatches,
-            RelevantGraphRelations: graphTriples,
+            RelevantGraphRelations: graphChains,
             SearchQuery: request.UserQuestion,
             AnswerStream: stream
         );

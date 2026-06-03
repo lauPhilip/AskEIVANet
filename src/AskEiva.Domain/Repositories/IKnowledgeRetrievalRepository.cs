@@ -9,7 +9,7 @@ namespace AskEiva.Domain.Repositories;
 public interface IKnowledgeRetrievalRepository
 {
     Task<IEnumerable<RetrievalMatch>> SearchSemanticChunksAsync(string userQuery, int limit);
-    Task<IEnumerable<KnowledgeTriple>> SearchGraphTriplesAsync(string userQuery, int limit);
+    Task<IEnumerable<GraphContextChain>> SearchGraphTriplesAsync(string userQuery, int limit);
     Task<int> GetTotalClassCountAsync(string className);
     Task<int> GetDistinctSourceCountAsync(string className, string groupProperty);
     Task<System.Text.Json.JsonElement> GetRawInteractionLogsAsync(int limit);

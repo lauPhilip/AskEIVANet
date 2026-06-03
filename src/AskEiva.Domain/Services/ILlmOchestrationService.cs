@@ -10,6 +10,6 @@ public interface ILlmOrchestrationService
     Task<string> DistillContextIntoAnswerAsync(
         string userQuestion, 
         IEnumerable<RetrievalMatch> semanticContext, 
-        IEnumerable<KnowledgeTriple> structuralGraph
+        IEnumerable<GraphContextChain> structuralGraphMashes
     );
 }

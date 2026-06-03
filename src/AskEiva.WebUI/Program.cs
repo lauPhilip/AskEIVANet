@@ -222,15 +222,6 @@ builder.Services.AddHttpClient<IMistralChatService, MistralChatService>(client =
 })
 .ConfigurePrimaryHttpMessageHandler(() => GetNetworkHandlerForEnvironment());
 
-// Mistral Graph Extraction Engine Client
-builder.Services.AddHttpClient<IExtractionEngine, MistralExtractionEngine>(client =>
-{
-    client.BaseAddress = new Uri("https://api.mistral.ai/");
-    client.DefaultRequestHeaders.Clear();
-    client.DefaultRequestHeaders.Add("Authorization", $"Bearer {cleanMistralKey}");
-})
-.ConfigurePrimaryHttpMessageHandler(() => GetNetworkHandlerForEnvironment());
-
 // --- 4. ASP.NET IDENTITY LIFECYCLE MANAGEMENT BINDINGS ---
 builder.Services.AddScoped<IUserStore<ApplicationUser>, WeaviateUserStore>();
 
