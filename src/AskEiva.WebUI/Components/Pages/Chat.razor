@@ -72,49 +72,81 @@
                                                        Icon="@Icons.Material.Filled.FactCheck"
                                                        Style="background: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 6px;">
                                         
-                                        <MudTabs Elevation="0" Rounded="true" ApplyEffectsToInnerViews="true" Color="Color.Primary" Outlined="true" Dense="true">
-                                            
-                                            @* 💡 Tab Panel A: RAG Elements *@
-                                            <MudTabPanel Text="RAG">
-                                                <MudTable Items="msg.SemanticMatches" Dense="true" Hover="true" Elevation="0" Class="mt-2">
-                                                    <HeaderContent>
-                                                        <MudTh>Type</MudTh>
-                                                        <MudTh>Title / Section Origin</MudTh>
-                                                        <MudTh>Proximity Score</MudTh>
-                                                        <MudTh>Content Preview Summary</MudTh>
-                                                    </HeaderContent>
-                                                    <RowTemplate>
-                                                        <MudTd><span class="type-badge @context.SourceType.ToLowerInvariant()">@context.SourceType</span></MudTd>
-                                                        <MudTd Style="font-weight: 500; font-size: 13px;"><a href="@context.SourceUrl" target="_blank" style="color: #0284C7; text-decoration: none;">@context.Title</a></MudTd>
-                                                        <MudTd Style="font-family: monospace;">@context.ConfidenceScore.ToString("F4")</MudTd>
-                                                        <MudTd Style="max-width: 320px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; color: #64748B;">
-                                                            <MudTooltip Text="@context.Content" Placement="Placement.Top">
-                                                                @context.Content
-                                                            </MudTooltip>
-                                                        </MudTd>
-                                                    </RowTemplate>
-                                                </MudTable>
-                                            </MudTabPanel>
+<MudTabs Elevation="0" Rounded="true" Color="Color.Primary" Outlined="true">
+    
+    @* Tab 1: KnowledgeNode (Tickets) *@
+    <MudTabPanel Text="Tickets" Disabled="@(!HasSourceType(msg, "KnowledgeNode"))">
+        <MudTable Items="@GetMatchesBySource(msg, "KnowledgeNode")" Dense="true" Hover="true" Elevation="0" Class="mt-2">
+            <HeaderContent>
+                <MudTh>Ticket Title / Identifier</MudTh>
+                <MudTh>Proximity Score</MudTh>
+                <MudTh>Content Preview Summary</MudTh>
+            </HeaderContent>
+            <RowTemplate>
+                <MudTd Style="font-weight: 500; font-size: 13px;"><a href="@context.SourceUrl" target="_blank" style="color: #0284C7; text-decoration: none;">@context.Title</a></MudTd>
+                <MudTd Style="font-family: monospace;">@context.ConfidenceScore.ToString("F4")</MudTd>
+                <MudTd Style="max-width: 450px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; color: #64748B;">
+                    <MudTooltip Text="@context.Content" Placement="Placement.Top">@context.Content</MudTooltip>
+                </MudTd>
+            </RowTemplate>
+        </MudTable>
+    </MudTabPanel>
 
-                                            @* 💡 Tab Panel B: GraphRAG Paths *@
-                                            <MudTabPanel Text="GraphRAG">
-                                                <MudTable Items="msg.GraphChains" Dense="true" Hover="true" Elevation="0" Class="mt-2">
-                                                    <HeaderContent>
-                                                        <MudTh>Evidence Ref</MudTh>
-                                                        <MudTh>Product Anchor</MudTh>
-                                                        <MudTh>Knowledge Graph Pathway</MudTh>
-                                                        <MudTh>Confidence</MudTh>
-                                                    </HeaderContent>
-                                                    <RowTemplate>
-                                                        <MudTd><MudText Typo="Typo.caption" Style="font-weight: bold; color: #0284C7;">@context.TicketId</MudText></MudTd>
-                                                        <MudTd><MudChip T="string" Variant="Variant.Text" Size="Size.Small" Color="Color.Primary">@context.MainProductContext</MudChip></MudTd>
-                                                        <MudTd Style="font-family: monospace; font-size: 11px; color: #0F172A; background: #F1F5F9; border-radius: 4px; padding: 6px;">@context.SharedPathChain</MudTd>
-                                                        <MudTd><MudChip T="string" Size="Size.Small" Color="Color.Success" Variant="Variant.Outlined">@context.ConfidenceScore%</MudChip></MudTd>
-                                                    </RowTemplate>
-                                                </MudTable>
-                                            </MudTabPanel>
+    @* Tab 2: SoftwareReleaseNode (Release Notes) *@
+    <MudTabPanel Text="Release Notes" Disabled="@(!HasSourceType(msg, "SoftwareReleaseNode"))">
+        <MudTable Items="@GetMatchesBySource(msg, "SoftwareReleaseNode")" Dense="true" Hover="true" Elevation="0" Class="mt-2">
+            <HeaderContent>
+                <MudTh>Release Version / Header</MudTh>
+                <MudTh>Proximity Score</MudTh>
+                <MudTh>Content Preview Summary</MudTh>
+            </HeaderContent>
+            <RowTemplate>
+                <MudTd Style="font-weight: 500; font-size: 13px;"><a href="@context.SourceUrl" target="_blank" style="color: #0369A1; text-decoration: none;">@context.Title</a></MudTd>
+                <MudTd Style="font-family: monospace;">@context.ConfidenceScore.ToString("F4")</MudTd>
+                <MudTd Style="max-width: 450px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; color: #64748B;">
+                    <MudTooltip Text="@context.Content" Placement="Placement.Top">@context.Content</MudTooltip>
+                </MudTd>
+            </RowTemplate>
+        </MudTable>
+    </MudTabPanel>
 
-                                        </MudTabs>
+    @* Tab 3: DocumentLibrary (Documentation Manuals) *@
+    <MudTabPanel Text="Documentation" Disabled="@(!HasSourceType(msg, "DocumentLibrary"))">
+        <MudTable Items="@GetMatchesBySource(msg, "DocumentLibrary")" Dense="true" Hover="true" Elevation="0" Class="mt-2">
+            <HeaderContent>
+                <MudTh>Manual Section / Origin</MudTh>
+                <MudTh>Proximity Score</MudTh>
+                <MudTh>Content Preview Summary</MudTh>
+            </HeaderContent>
+            <RowTemplate>
+                <MudTd Style="font-weight: 500; font-size: 13px;"><a href="@context.SourceUrl" target="_blank" style="color: #6B21A8; text-decoration: none;">@context.Title</a></MudTd>
+                <MudTd Style="font-family: monospace;">@context.ConfidenceScore.ToString("F4")</MudTd>
+                <MudTd Style="max-width: 450px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; color: #64748B;">
+                    <MudTooltip Text="@context.Content" Placement="Placement.Top">@context.Content</MudTooltip>
+                </MudTd>
+            </RowTemplate>
+        </MudTable>
+    </MudTabPanel>
+
+    @* Tab 4: GraphRAG Paths *@
+    <MudTabPanel Text="GraphRAG" Disabled="@(!msg.GraphChains.Any())">
+        <MudTable Items="msg.GraphChains" Dense="true" Hover="true" Elevation="0" Class="mt-2">
+            <HeaderContent>
+                <MudTh>Evidence Ref</MudTh>
+                <MudTh>Product Anchor</MudTh>
+                <MudTh>Knowledge Graph Pathway</MudTh>
+                <MudTh>Confidence</MudTh>
+            </HeaderContent>
+            <RowTemplate>
+                <MudTd><MudText Typo="Typo.caption" Style="font-weight: bold; color: #0284C7;">@context.TicketId</MudText></MudTd>
+                <MudTd><MudChip T="string" Variant="Variant.Text" Size="Size.Small" Color="Color.Primary">@context.MainProductContext</MudChip></MudTd>
+                <MudTd Style="font-family: monospace; font-size: 11px; color: #0F172A; background: #F1F5F9; border-radius: 4px; padding: 6px;">@context.SharedPathChain</MudTd>
+                <MudTd><MudChip T="string" Size="Size.Small" Color="Color.Success" Variant="Variant.Outlined">@context.ConfidenceScore%</MudChip></MudTd>
+            </RowTemplate>
+        </MudTable>
+    </MudTabPanel>
+
+</MudTabs>
                                     </MudExpansionPanel>
                                 </MudExpansionPanels>
                             </div>
@@ -186,6 +218,21 @@
 
     private bool IsAnySourceChecked() => _includeTickets || _includeReleaseNotes || _includeDocumentation;
 
+    // Checks tab disable states safely
+    private bool HasSourceType(UIConversationMessage message, string targetType)
+    {
+        if (message?.SemanticMatches == null) return false;
+        return message.SemanticMatches.Any(m => string.Equals(m.SourceType, targetType, StringComparison.OrdinalIgnoreCase));
+    }
+
+    // 💡 THE ULTIMATE FIX: Filters the items safely inside pure C# space to bypass the Razor property quote generator bug
+    private IEnumerable<RetrievalMatch> GetMatchesBySource(UIConversationMessage message, string targetType)
+    {
+        if (message?.SemanticMatches == null) return Enumerable.Empty<RetrievalMatch>();
+        
+        return message.SemanticMatches.Where(m => string.Equals(m.SourceType, targetType, StringComparison.OrdinalIgnoreCase));
+    }
+
     private async Task SubmitPrompt()
     {
         if (string.IsNullOrWhiteSpace(_currentPrompt) || _isProcessing || !IsAnySourceChecked()) return;
@@ -203,16 +250,19 @@
 
         try
         {
-            var completeSemanticMatches = await RetrievalRepository.SearchSemanticChunksAsync(userText, limit: 6);
+            // 1. Fetch a wider list of underlying contexts from Weaviate to ensure all categories are represented
+            var completeSemanticMatches = await RetrievalRepository.SearchSemanticChunksAsync(userText, limit: 12);
             
+            //  Targets your true Weaviate collection schemas: KnowledgeNode, SoftwareReleaseNode, and DocumentLibrary
             var filteredMatches = completeSemanticMatches.Where(m => 
-                (m.SourceType.Equals("Ticket", StringComparison.OrdinalIgnoreCase) && _includeTickets) ||
-                (m.SourceType.Equals("ReleaseNote", StringComparison.OrdinalIgnoreCase) && _includeReleaseNotes) ||
-                (m.SourceType.Equals("Documentation", StringComparison.OrdinalIgnoreCase) && _includeDocumentation)
-            ).Take(3).ToList();
+                (m.SourceType.Equals("KnowledgeNode", StringComparison.OrdinalIgnoreCase) && _includeTickets) ||
+                (m.SourceType.Equals("SoftwareReleaseNode", StringComparison.OrdinalIgnoreCase) && _includeReleaseNotes) ||
+                (m.SourceType.Equals("DocumentLibrary", StringComparison.OrdinalIgnoreCase) && _includeDocumentation)
+            ).ToList(); // Remove the restrictive .Take(3) so the context window gets complete data packages
 
             responseMessage.SemanticMatches = filteredMatches;
 
+            // 2. Call your SearchGraphTriplesAsync contract to pull true GraphContextChains
             var activeGraphChains = await RetrievalRepository.SearchGraphTriplesAsync(userText, limit: 5);
             responseMessage.GraphChains = activeGraphChains.ToList();
 

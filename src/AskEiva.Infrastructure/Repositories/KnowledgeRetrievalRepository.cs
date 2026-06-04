@@ -22,131 +22,134 @@ public class KnowledgeRetrievalRepository : IKnowledgeRetrievalRepository
         _httpClient = httpClient;
     }
 
-    public async Task<IEnumerable<RetrievalMatch>> SearchSemanticChunksAsync(string userQuery, int limit)
+public async Task<IEnumerable<RetrievalMatch>> SearchSemanticChunksAsync(string userQuery, int limit)
+{
+    var url = "v1/graphql";
+    
+    // 💡 OPTIMIZATION: Ensure we query enough records from each array type to get a balanced cross-functional mix
+    int limitPerCollection = Math.Max(limit, 4);
+
+    var query = new
     {
-        var url = "v1/graphql";
-        
-        var query = new
+        query = $$"""
         {
-            query = $$"""
-            {
-              Get {
-                KnowledgeNode(
-                  limit: {{limit}}
-                  hybrid: { query: "{{userQuery}}", alpha: 0.5 }
-                ) {
-                  source_id
-                  subject
-                  content
-                  url
-                  _additional { score }
-                }
-                DocumentLibrary(
-                  limit: {{limit}}
-                  hybrid: { query: "{{userQuery}}", alpha: 0.5 }
-                ) {
-                  document_id
-                  title
-                  content
-                  url
-                  _additional { score }
-                }
-                SoftwareReleaseNode(
-                  limit: {{limit}}
-                  hybrid: { query: "{{userQuery}}", alpha: 0.5 }
-                ) {
-                  group_category
-                  product
-                  release_type
-                  version
-                  full_version_title
-                  metadata_note
-                  content_chunk
-                  ref_tickets
-                  _additional { score }
-                }
-              }
+          Get {
+            KnowledgeNode(
+              limit: {{limitPerCollection}}
+              hybrid: { query: "{{userQuery}}", alpha: 0.5 }
+            ) {
+              source_id
+              subject
+              content
+              url
+              _additional { score }
             }
-            """
-        };
-
-        try
-        {
-            var response = await _httpClient.PostAsync(url, new StringContent(JsonSerializer.Serialize(query), Encoding.UTF8, "application/json"));
-            if (!response.IsSuccessStatusCode) return Enumerable.Empty<RetrievalMatch>();
-
-            using var doc = await JsonDocument.ParseAsync(await response.Content.ReadAsStreamAsync());
-            var matches = new List<RetrievalMatch>();
-            var root = doc.RootElement.GetProperty("data").GetProperty("Get");
-
-            // 1. Parse ticket-based KnowledgeNodes
-            if (root.TryGetProperty("KnowledgeNode", out var ticketNodes))
-            {
-                foreach (var node in ticketNodes.EnumerateArray())
-                {
-                    float.TryParse(node.GetProperty("_additional").GetProperty("score").GetRawText(), out var score);
-                    matches.Add(new RetrievalMatch(
-                        SourceId: node.GetProperty("source_id").GetString() ?? string.Empty,
-                        Title: node.GetProperty("subject").GetString() ?? "Technical Excerpt",
-                        Content: node.GetProperty("content").GetString() ?? string.Empty,
-                        SourceUrl: node.GetProperty("url").GetString() ?? string.Empty,
-                        ConfidenceScore: score,
-                        SourceType: "Ticket",
-                        ImageUrls: new()
-                    ));
-                }
+            DocumentLibrary(
+              limit: {{limitPerCollection}}
+              hybrid: { query: "{{userQuery}}", alpha: 0.5 }
+            ) {
+              document_id
+              title
+              content
+              url
+              _additional { score }
             }
-
-            // 2. Parse documentation-based DocumentLibraries
-            if (root.TryGetProperty("DocumentLibrary", out var docNodes))
-            {
-                foreach (var node in docNodes.EnumerateArray())
-                {
-                    float.TryParse(node.GetProperty("_additional").GetProperty("score").GetRawText(), out var score);
-                    matches.Add(new RetrievalMatch(
-                        SourceId: node.TryGetProperty("document_id", out var idProp) ? idProp.GetString() ?? string.Empty : string.Empty,
-                        Title: node.TryGetProperty("title", out var titleProp) ? (titleProp.GetString() ?? "Documentation Article") : "Documentation Article",
-                        Content: node.GetProperty("content").GetString() ?? string.Empty,
-                        SourceUrl: node.GetProperty("url").GetString() ?? string.Empty,
-                        ConfidenceScore: score,
-                        SourceType: "Documentation",
-                        ImageUrls: new()
-                    ));
-                }
+            SoftwareReleaseNode(
+              limit: {{limitPerCollection}}
+              hybrid: { query: "{{userQuery}}", alpha: 0.5 }
+            ) {
+              product
+              version
+              metadata_note
+              content_chunk
+              ref_tickets
+              _additional { score }
             }
-
-            // 3. Parse Release Notes data blocks dynamically
-            if (root.TryGetProperty("SoftwareReleaseNode", out var releaseNodes))
-            {
-                foreach (var node in releaseNodes.EnumerateArray())
-                {
-                    float.TryParse(node.GetProperty("_additional").GetProperty("score").GetRawText(), out var score);
-                    string product = node.GetProperty("product").GetString() ?? "Product Note";
-                    string version = node.GetProperty("version").GetString() ?? "";
-                    string header = node.GetProperty("section_header").GetString() ?? "Release Spec";
-                    string note = node.TryGetProperty("metadata_note", out var nProp) ? nProp.GetString() ?? string.Empty : string.Empty;
-
-                    matches.Add(new RetrievalMatch(
-                        SourceId: node.TryGetProperty("ref_tickets", out var tProp) ? tProp.GetString() ?? string.Empty : string.Empty,
-                        Title: $"[{product} v{version}] {header}",
-                        Content: node.GetProperty("content_chunk").GetString() ?? string.Empty,
-                        SourceUrl: "https://download.eiva.com/#",
-                        ConfidenceScore: score,
-                        SourceType: "ReleaseNote",
-                        ImageUrls: new(),
-                        ProductContext: product,
-                        VersionContext: version
-                    ));
-                }
-            }
-
-            return matches.OrderByDescending(m => m.ConfidenceScore);
+          }
         }
-        catch
+        """
+    };
+
+    try
+    {
+        var response = await _httpClient.PostAsync(url, new StringContent(JsonSerializer.Serialize(query), Encoding.UTF8, "application/json"));
+        if (!response.IsSuccessStatusCode) return Enumerable.Empty<RetrievalMatch>();
+
+        using var doc = await JsonDocument.ParseAsync(await response.Content.ReadAsStreamAsync());
+        var matches = new List<RetrievalMatch>();
+        var root = doc.RootElement.GetProperty("data").GetProperty("Get");
+
+        // 1. Parse ticket-based KnowledgeNodes
+        if (root.TryGetProperty("KnowledgeNode", out var ticketNodes) && ticketNodes.ValueKind == JsonValueKind.Array)
         {
-            return Enumerable.Empty<RetrievalMatch>();
+            foreach (var node in ticketNodes.EnumerateArray())
+            {
+                float.TryParse(node.GetProperty("_additional").GetProperty("score").GetRawText(), out var score);
+                matches.Add(new RetrievalMatch(
+                    SourceId: node.GetProperty("source_id").GetString() ?? string.Empty,
+                    Title: node.GetProperty("subject").GetString() ?? "Technical Excerpt",
+                    Content: node.GetProperty("content").GetString() ?? string.Empty,
+                    SourceUrl: node.GetProperty("url").GetString() ?? string.Empty,
+                    ConfidenceScore: score,
+                    SourceType: "KnowledgeNode", // 💡 FIXED: Matches Chat.razor tab filters perfectly!
+                    ImageUrls: new()
+                ));
+            }
         }
+
+        // 2. Parse documentation-based DocumentLibraries
+        if (root.TryGetProperty("DocumentLibrary", out var docNodes) && docNodes.ValueKind == JsonValueKind.Array)
+        {
+            foreach (var node in docNodes.EnumerateArray())
+            {
+                float.TryParse(node.GetProperty("_additional").GetProperty("score").GetRawText(), out var score);
+                matches.Add(new RetrievalMatch(
+                    SourceId: node.TryGetProperty("document_id", out var idProp) ? idProp.GetString() ?? string.Empty : string.Empty,
+                    Title: node.TryGetProperty("title", out var titleProp) ? (titleProp.GetString() ?? "Documentation Article") : "Documentation Article",
+                    Content: node.GetProperty("content").GetString() ?? string.Empty,
+                    SourceUrl: node.GetProperty("url").GetString() ?? string.Empty,
+                    ConfidenceScore: score,
+                    SourceType: "DocumentLibrary", // 💡 FIXED: Matches Chat.razor tab filters perfectly!
+                    ImageUrls: new()
+                ));
+            }
+        }
+
+        // 3. Parse Release Notes data blocks dynamically
+        if (root.TryGetProperty("SoftwareReleaseNode", out var releaseNodes) && releaseNodes.ValueKind == JsonValueKind.Array)
+        {
+            foreach (var node in releaseNodes.EnumerateArray())
+            {
+                float.TryParse(node.GetProperty("_additional").GetProperty("score").GetRawText(), out var score);
+                string product = node.GetProperty("product").GetString() ?? "Product Note";
+                string version = node.GetProperty("version").GetString() ?? "";
+                
+                // Fixed key accessors to align safely with your raw schema property choices
+                string note = node.TryGetProperty("metadata_note", out var nProp) ? nProp.GetString() ?? string.Empty : string.Empty;
+
+                matches.Add(new RetrievalMatch(
+                    SourceId: node.TryGetProperty("ref_tickets", out var tProp) ? tProp.GetString() ?? string.Empty : string.Empty,
+                    Title: $"[{product} v{version}] Release Excerpt",
+                    Content: node.GetProperty("content_chunk").GetString() ?? string.Empty,
+                    SourceUrl: "https://download.eiva.com/#",
+                    ConfidenceScore: score,
+                    SourceType: "SoftwareReleaseNode", // 💡 FIXED: Matches Chat.razor tab filters perfectly!
+                    ImageUrls: new(),
+                    ProductContext: product,
+                    VersionContext: version
+                ));
+            }
+        }
+
+        // Return a clean, descending ranked distribution collection
+        return matches.OrderByDescending(m => m.ConfidenceScore);
     }
+    catch (Exception ex)
+    {
+        Console.WriteLine($"[Weaviate Mapping Exception]: {ex.Message}");
+        return Enumerable.Empty<RetrievalMatch>();
+    }
+}
 
     public async Task<JsonElement> FetchRawGraphMeshJsonAsync(string filterText)
 {
