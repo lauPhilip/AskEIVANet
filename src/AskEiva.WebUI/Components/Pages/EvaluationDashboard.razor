@@ -8,7 +8,7 @@
 @inject IKnowledgeRetrievalRepository KnowledgeRepo
 @inject IMediator Mediator
 
-<MudContainer MaxWidth="MaxWidth.Large" Class="mt-4">
+<MudContainer MaxWidth="MaxWidth.ExtraLarge" Class="mt-4">
     
     @* --- SYSTEM KPI & REINFORCEMENT LEARNING METRICS PANEL --- *@
     <MudGrid Class="mb-4">
@@ -42,9 +42,10 @@
         </MudItem>
     </MudGrid>
 
-    @* --- THE MATCHING GAME WORKSPACE --- *@
+@* --- THE MATCHING GAME WORKSPACE (Maximized Width) --- *@
     <MudGrid Justify="Justify.Center">
-        <MudItem xs="12" md="8">
+        @* 💡 OPTIMIZATION: Shifted from xs=12/md=8 out to full widescreen footprint spans *@
+        <MudItem xs="12" lg="11" xl="10">
             @if (_isLoadingDeck)
             {
                 <MudPaper Elevation="1" Class="pa-12 text-center" Style="border: 1px solid #E2E8F0; border-radius: 16px; background: #FFFFFF;">
@@ -56,8 +57,8 @@
             {
                 var card = _evalCards[_currentCardIndex];
 
-                <MudPaper Elevation="2" Class="pa-6 d-flex flex-column justify-space-between animation-card" 
-                          Style="@($"border: 1px solid #E2E8F0; border-radius: 16px; min-height: 480px; background: #FFFFFF; transform: rotate({_cardRotation}deg); transition: transform 0.2s ease;")">
+                <MudPaper Elevation="2" Class="pa-8 d-flex flex-column justify-space-between animation-card" 
+                          Style="@($"border: 1px solid #E2E8F0; border-radius: 16px; min-height: 400px; background: #FFFFFF; transform: rotate({_cardRotation}deg); transition: transform 0.2s ease; width: 100%;")">
                     
                     <div>
                         <div class="d-flex align-center justify-space-between mb-4">
@@ -66,21 +67,23 @@
                         </div>
 
                         <MudText Typo="Typo.subtitle2" Style="color: #64748B; text-transform: uppercase; font-weight: bold;">Incoming Ticket:</MudText>
-                        <MudPaper Class="pa-3 my-2" Style="background: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 8px; max-height: 400px; overflow-y: auto;">
-                            <MudText Typo="Typo.body2" Style="color: #0A2540; font-family: monospace; white-space: pre-wrap;">@card.Query</MudText>
+                        @* 💡 LAYOUT CHANGE: Switched max-height parameters to min-height auto-scaling to prevent scroll traps *@
+                        <MudPaper Class="pa-4 my-2" Style="background: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 8px; min-height: 100px; overflow-y: auto;">
+                            <MudText Typo="Typo.body2" Style="color: #0A2540; font-family: monospace; white-space: pre-wrap; font-size: 0.9rem; line-height: 1.5;">@card.Query</MudText>
                         </MudPaper>
                         
-                        <MudDivider Class="my-3" />
+                        <MudDivider Class="my-4" />
 
                         <MudText Typo="Typo.subtitle2" Style="color: #7C3AED; text-transform: uppercase; font-weight: bold;" Class="d-flex align-center gap-1">
                             <MudIcon Icon="@Icons.Material.Filled.AutoAwesome" Size="Size.Small" /> AskEIVA Proposed Fix:
                         </MudText>
                         
-                        <MudPaper Class="pa-3 my-2" Style="background: #FDFEFE; border: 1px solid #D8DEE4; border-radius: 8px; max-height: 140px; overflow-y: auto;">
-                            <MudText Typo="Typo.body2" Style="line-height: 1.6; color: #1E293B;">@card.GroundTruth</MudText>
+                        @* 💡 LAYOUT CHANGE: Removed rigid max-height barriers so long step-by-step instructions span elegantly across the screen *@
+                        <MudPaper Class="pa-4 my-2" Style="background: #FDFEFE; border: 1px solid #D8DEE4; border-radius: 8px; min-height: 120px; overflow-y: auto;">
+                            <MudText Typo="Typo.body2" Style="line-height: 1.6; color: #1E293B; font-size: 0.95rem; white-space: pre-wrap;">@card.ProposedAnswer</MudText>
                         </MudPaper>
                         
-                        <div class="d-flex align-center gap-2 mt-3 flex-wrap">
+                        <div class="d-flex align-center gap-2 mt-4 flex-wrap">
                             <MudText Typo="Typo.caption" Class="font-weight-bold mr-1">Retrieved Vectors:</MudText>
                             @foreach(var tag in card.ExpectedContextKeys)
                             {
@@ -89,26 +92,26 @@
                         </div>
                     </div>
 
-                    <div class="d-flex align-center justify-space-around mt-6 pt-4" style="border-top: 1px solid #F1F5F9;">
+                    <div class="d-flex align-center justify-space-between mt-6 pt-4 flex-wrap gap-4" style="border-top: 1px solid #F1F5F9;">
                         <MudButton Variant="Variant.Filled" 
                                    Color="Color.Error" 
                                    Size="Size.Large"
                                    OnClick="@(() => ProcessSwipeActionAsync(false))"
-                                   StartIcon="@Icons.Material.Filled.ContentCut"
-                                   Style="border-radius: 50px; width: 140px; height: 48px; box-shadow: 0 4px 14px rgba(220, 38, 38, 0.3);">
+                                   StartIcon="@Icons.Material.Filled.Close"
+                                   Style="border-radius: 50px; width: 160px; height: 48px; box-shadow: 0 4px 14px rgba(220, 38, 38, 0.3); font-weight: bold;">
                             Reject
                         </MudButton>
 
                         <MudTextField @bind-Value="_correctionBuffer" 
-                                      Placeholder="Optional correction notes..." 
-                                      Variant="Variant.Outlined" Margin="Margin.Dense" Class="mx-4 flex-grow-1" Style="background: #FFFFFF;" />
+                                      Placeholder="Add engineering adjustments or correction notes here..." 
+                                      Variant="Variant.Outlined" Margin="Margin.Dense" Class="flex-grow-1" Style="background: #FFFFFF;" />
 
                         <MudButton Variant="Variant.Filled" 
                                    Color="Color.Success" 
                                    Size="Size.Large"
                                    OnClick="@(() => ProcessSwipeActionAsync(true))"
                                    EndIcon="@Icons.Material.Filled.CheckCircle"
-                                   Style="border-radius: 50px; width: 140px; height: 48px; box-shadow: 0 4px 14px rgba(5, 150, 105, 0.3);">
+                                   Style="border-radius: 50px; width: 160px; height: 48px; box-shadow: 0 4px 14px rgba(5, 150, 105, 0.3); font-weight: bold;">
                             Approve
                         </MudButton>
                     </div>

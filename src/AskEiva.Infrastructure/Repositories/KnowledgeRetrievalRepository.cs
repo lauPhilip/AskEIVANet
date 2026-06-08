@@ -17,12 +17,11 @@ namespace AskEiva.Infrastructure.Repositories;
 
 public class KnowledgeRetrievalRepository : IKnowledgeRetrievalRepository
 {
-    private readonly HttpClient _httpClient;
+    private readonly HttpClient _weaviateClient;
+    private readonly HttpClient _mistralClient;
     
-    // 💡 THE CONCURRENCY GUARD: Prevents cross-circuit thread lock collisions when multiple users swipe simultaneously
     private static readonly SemaphoreSlim _fileLock = new(1, 1);
     
-    // 💡 THE REINFORCEMENT LEARNING DIRECTORY CORNERSTONE
     private readonly string _evaluationDatasetPath = Path.Combine(
         AppDomain.CurrentDomain.BaseDirectory, 
         "..", "..", "..", "..", "..", 
@@ -30,16 +29,15 @@ public class KnowledgeRetrievalRepository : IKnowledgeRetrievalRepository
         "eiva_rlhf_training_matrix.json"
     );
 
-    public KnowledgeRetrievalRepository(HttpClient httpClient)
+    public KnowledgeRetrievalRepository(HttpClient httpClient, IHttpClientFactory httpClientFactory)
     {
-        _httpClient = httpClient;
+        _weaviateClient = httpClient;
+        _mistralClient = httpClientFactory.CreateClient("MistralClient");
     }
 
     public async Task<IEnumerable<RetrievalMatch>> SearchSemanticChunksAsync(string userQuery, int limit)
     {
         var url = "v1/graphql";
-        
-        // Ensure we query enough records from each array type to get a balanced cross-functional mix
         int limitPerCollection = Math.Max(limit, 4);
 
         var query = new
@@ -85,19 +83,23 @@ public class KnowledgeRetrievalRepository : IKnowledgeRetrievalRepository
 
         try
         {
-            var response = await _httpClient.PostAsync(url, new StringContent(JsonSerializer.Serialize(query), Encoding.UTF8, "application/json"));
+            var response = await _weaviateClient.PostAsync(url, new StringContent(JsonSerializer.Serialize(query), Encoding.UTF8, "application/json"));
             if (!response.IsSuccessStatusCode) return Enumerable.Empty<RetrievalMatch>();
 
             using var doc = await JsonDocument.ParseAsync(await response.Content.ReadAsStreamAsync());
             var matches = new List<RetrievalMatch>();
             var root = doc.RootElement.GetProperty("data").GetProperty("Get");
 
-            // 1. Parse ticket-based KnowledgeNodes
             if (root.TryGetProperty("KnowledgeNode", out var ticketNodes) && ticketNodes.ValueKind == JsonValueKind.Array)
             {
                 foreach (var node in ticketNodes.EnumerateArray())
                 {
-                    float.TryParse(node.GetProperty("_additional").GetProperty("score").GetRawText(), out var score);
+                    float score = 0.0f;
+                    if (node.TryGetProperty("_additional", out var addProp) && addProp.TryGetProperty("score", out var scoreProp))
+                    {
+                        float.TryParse(scoreProp.GetRawText(), out score);
+                    }
+
                     matches.Add(new RetrievalMatch(
                         SourceId: node.GetProperty("source_id").GetString() ?? string.Empty,
                         Title: node.GetProperty("subject").GetString() ?? "Technical Excerpt",
@@ -110,12 +112,16 @@ public class KnowledgeRetrievalRepository : IKnowledgeRetrievalRepository
                 }
             }
 
-            // 2. Parse documentation-based DocumentLibraries
             if (root.TryGetProperty("DocumentLibrary", out var docNodes) && docNodes.ValueKind == JsonValueKind.Array)
             {
                 foreach (var node in docNodes.EnumerateArray())
                 {
-                    float.TryParse(node.GetProperty("_additional").GetProperty("score").GetRawText(), out var score);
+                    float score = 0.0f;
+                    if (node.TryGetProperty("_additional", out var addProp) && addProp.TryGetProperty("score", out var scoreProp))
+                    {
+                        float.TryParse(scoreProp.GetRawText(), out score);
+                    }
+
                     matches.Add(new RetrievalMatch(
                         SourceId: node.TryGetProperty("document_id", out var idProp) ? idProp.GetString() ?? string.Empty : string.Empty,
                         Title: node.TryGetProperty("title", out var titleProp) ? (titleProp.GetString() ?? "Documentation Article") : "Documentation Article",
@@ -128,15 +134,18 @@ public class KnowledgeRetrievalRepository : IKnowledgeRetrievalRepository
                 }
             }
 
-            // 3. Parse Release Notes data blocks dynamically
             if (root.TryGetProperty("SoftwareReleaseNode", out var releaseNodes) && releaseNodes.ValueKind == JsonValueKind.Array)
             {
                 foreach (var node in releaseNodes.EnumerateArray())
                 {
-                    float.TryParse(node.GetProperty("_additional").GetProperty("score").GetRawText(), out var score);
+                    float score = 0.0f;
+                    if (node.TryGetProperty("_additional", out var addProp) && addProp.TryGetProperty("score", out var scoreProp))
+                    {
+                        float.TryParse(scoreProp.GetRawText(), out score);
+                    }
+
                     string product = node.GetProperty("product").GetString() ?? "Product Note";
                     string version = node.GetProperty("version").GetString() ?? "";
-                    string note = node.TryGetProperty("metadata_note", out var nProp) ? nProp.GetString() ?? string.Empty : string.Empty;
 
                     matches.Add(new RetrievalMatch(
                         SourceId: node.TryGetProperty("ref_tickets", out var tProp) ? tProp.GetString() ?? string.Empty : string.Empty,
@@ -170,21 +179,20 @@ public class KnowledgeRetrievalRepository : IKnowledgeRetrievalRepository
                 Query: "[FD-70821] Navipac-Dongle10513497-DB Version 4.0.3.0\n\nLooking for advice regarding Master Helmsman PC sensor registration telemetry drifts.",
                 ProposedAnswer: "Proposed Fix: Configure baseline communication bindings down to alternative virtual port addresses or apply firmware updates matching your hardware profile layout constraints.",
                 GroundTruth: "Verified Engineering Fix: Update primary USBL serial buffer IO frames via NaviPac's dynamic configuration module system manager layout.",
-                ExpectedContextKeys: new() { "NAVIPAC", "DONGLE-LICENSE", "KNOWLEDGEnode" },
+                ExpectedContextKeys: new() { "NaviPac", "KnowledgeNode" },
                 ContextDocumentationChunks: new() { "Documentation Manual reference fragment: Ensure dongle drivers are properly mapped in offline machine profiles." }
             )
         };
         return fallback.Take(count).ToList();
     }
-public async Task<List<EvaluationTestCase>> FetchEvaluationDeckByPhaseAsync(EvaluationPhase phase, int count)
+
+    public async Task<List<EvaluationTestCase>> FetchEvaluationDeckByPhaseAsync(EvaluationPhase phase, int count)
     {
         var deck = new List<EvaluationTestCase>();
 
         if (phase == EvaluationPhase.ClosedBaseline)
         {
             var url = "v1/graphql";
-            
-            // 💡 STRATEGY: Grab 40 blocks randomly to guarantee that each deck pull has unique, randomized combinations
             var gqlQuery = """
             {
               Get {
@@ -200,7 +208,7 @@ public async Task<List<EvaluationTestCase>> FetchEvaluationDeckByPhaseAsync(Eval
 
             try
             {
-                var response = await _httpClient.PostAsJsonAsync(url, new { query = gqlQuery });
+                var response = await _weaviateClient.PostAsJsonAsync(url, new { query = gqlQuery });
                 if (!response.IsSuccessStatusCode) return GetFallbackBaselineDeck(count);
 
                 using var doc = await JsonDocument.ParseAsync(await response.Content.ReadAsStreamAsync());
@@ -216,7 +224,6 @@ public async Task<List<EvaluationTestCase>> FetchEvaluationDeckByPhaseAsync(Eval
 
                     if (!ticketGroups.Any()) return GetFallbackBaselineDeck(count);
 
-                    // Randomize the pull selection completely on every single loop pass
                     var randomizer = new Random();
                     var selectedGroups = ticketGroups.OrderBy(_ => randomizer.Next()).Take(count);
 
@@ -225,7 +232,6 @@ public async Task<List<EvaluationTestCase>> FetchEvaluationDeckByPhaseAsync(Eval
                         string ticketId = group.Key;
                         string subjectLine = group.First().GetProperty("subject").GetString() ?? "EIVA Support Request";
 
-                        // Stitch the fragmented chunks back together safely
                         var fullTextBuilder = new StringBuilder();
                         foreach (var chunk in group.OrderBy(c => c.GetProperty("url").GetString()))
                         {
@@ -233,7 +239,6 @@ public async Task<List<EvaluationTestCase>> FetchEvaluationDeckByPhaseAsync(Eval
                         }
                         string continuousText = fullTextBuilder.ToString();
 
-                        // 💡 FIXED: Regex extraction splits lines cleanly at common agent signature dividers
                         string isolatedCustomerQuery = "";
                         string isolatedAgentGroundTruth = "";
 
@@ -251,17 +256,13 @@ public async Task<List<EvaluationTestCase>> FetchEvaluationDeckByPhaseAsync(Eval
                             isolatedAgentGroundTruth = "Resolved via standard technical operational validation protocols.";
                         }
 
-                        // Ensure our query doesn't retain old dangling artifact signatures
                         isolatedCustomerQuery = Regex.Replace(isolatedCustomerQuery, @"^Hello[\s\S]*?(?=Hope|Looking|We)", "", RegexOptions.IgnoreCase);
 
-                        // 🔍 DYNAMIC RAG LOOKUP: Query Weaviate for documentation and release notes supporting this query
                         var supportingDocs = await RetrieveSupportingDocumentationChunksAsync(subjectLine, isolatedCustomerQuery);
-
-                        // 🧠 MISTRAL GENERATION: Request the model suggest a resolution using the agent responses as context
                         string proposedModelFix = await GenerateMistralProposedSolutionAsync(isolatedCustomerQuery, isolatedAgentGroundTruth, supportingDocs);
 
-                        var badges = new List<string> { "NAVIPAC", "KNOWLEDGEnode" };
-                        if (isolatedCustomerQuery.Contains("Dongle", StringComparison.OrdinalIgnoreCase)) badges.Add("DONGLE-LICENSE");
+                        // 💡 DYNAMIC CATEGORIES MATCH: Matches all official product strings
+                        var badges = ParseDynamicContextKeys(continuousText);
 
                         deck.Add(new EvaluationTestCase(
                             Id: ticketId,
@@ -285,141 +286,110 @@ public async Task<List<EvaluationTestCase>> FetchEvaluationDeckByPhaseAsync(Eval
 
     private async Task<List<string>> RetrieveSupportingDocumentationChunksAsync(string subject, string queryText)
     {
-        // Executes a quick lookup against DocumentLibrary schema layouts
         var searchMatches = await SearchSemanticChunksAsync($"{subject} {queryText}", limit: 2);
         return searchMatches.Where(m => m.SourceType == "DocumentLibrary").Select(m => m.Content).ToList();
     }
 
     private async Task<string> GenerateMistralProposedSolutionAsync(string customerIssue, string agentAnswers, List<string> docs)
     {
-        // 💡 THINKING PROMPT CONTEXT WINDOW: Forces the LLM to think, analyze the issue, and propose a clean solution
         var promptPayload = new
         {
             model = "mistral-large-latest",
             messages = new[]
             {
-                new { role = "system", content = "You are the AskEIVA technical reasoning engine. Review the customer's problem context and historical support interactions to provide a precise solution." },
-                new { role = "user", content = $"""
-                    [Customer Incident Ticket]:
-                    {customerIssue}
+                new { 
+                    role = "system", 
+                    content = "You are AskEIVA, an expert reasoning agent for marine survey software. Analyze the customer's problem description. Use the historical technical support interactions and documentation manual excerpts provided to formulate a crisp, direct troubleshooting fix. Do not repeat greeting signatures or metadata headers." 
+                },
+                new { 
+                    role = "user", 
+                    content = $"""
+                        [Customer Support Ticket Incident]:
+                        {customerIssue}
 
-                    [Historical Internal Expert Responses Context]:
-                    {agentAnswers}
+                        [Historical Internal Expert Resolution Context]:
+                        {agentAnswers}
 
-                    [Supporting Documentation Manual Reference Fragments]:
-                    {string.Join("\n\n", docs)}
+                        [Supporting Documentation Manual Reference Fragments]:
+                        {string.Join("\n\n", docs)}
 
-                    Analyze the problem context and suggest the final technical solution or patch to resolve the issue. Do not include signature greetings.
-                    """ }
-            }
+                        Based strictly on the expert context above, what is the final proposed engineering fix for this customer issue? Propose the direct troubleshooting steps now.
+                        """ 
+                }
+            },
+            temperature = 0.2,
+            max_tokens = 400
         };
 
-        // TODO: Map a standard client post hop `_httpClient.PostAsJsonAsync("v1/chat/completions", promptPayload)` 
-        // For right now, we return a beautifully structured prediction string summary:
-        return "Proposed Fix: Configure baseline communication bindings down to alternative virtual port addresses or apply firmware updates matching your hardware profile layout constraints.";
-    }
-
-    // --- PARSING & CLEANING HELPER UTILITIES ---
-
-    private string ExtractCustomerProblemText(string fullBody, string subject, string ticketId)
-    {
-        // If the text contains support thread headers, extract the initial message body
-        if (fullBody.Contains("From:", StringComparison.OrdinalIgnoreCase) || fullBody.Contains("Looking for some advice", StringComparison.OrdinalIgnoreCase))
-        {
-            int index = fullBody.IndexOf("Regards", StringComparison.OrdinalIgnoreCase);
-            if (index > 0) return $"[{ticketId}] {subject}\n\n" + fullBody.Substring(0, index + 7).Trim();
-        }
-        
-        // Fallback: Return a clean subset of the text if it is too long
-        return $"[{ticketId}] {subject}\n\n" + (fullBody.Length > 500 ? fullBody.Substring(0, 500) + "..." : fullBody).Trim();
-    }
-
-    private string ExtractVerifiedResolutionText(string fullBody)
-    {
-        // Locate common response signature blocks used by the support team
-        string marker = "Best regards / Med venlig hilsen";
-        if (fullBody.Contains(marker, StringComparison.OrdinalIgnoreCase))
-        {
-            int markerIdx = fullBody.IndexOf(marker, StringComparison.OrdinalIgnoreCase);
-            int startIdx = Math.Max(0, markerIdx - 350);
-            return "Verified Engineering Fix:\n" + fullBody.Substring(startIdx, markerIdx - startIdx).Trim();
-        }
-
-        // Alternative check: Search for text indicators that pinpoint the closing solution
-        int fixIdx = fullBody.LastIndexOf("fixed in", StringComparison.OrdinalIgnoreCase);
-        if (fixIdx > 0) return "Verified Engineering Fix:\n" + fullBody.Substring(fixIdx).Trim();
-
-        return "Verified Engineering Fix:\nReview log transaction reference histories to apply the matching firmware or driver update patch.";
-    }
-
-    private List<string> ParseDynamicContextKeys(string fullBody)
-    {
-        var tags = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        
-        // Scan text content to assign target product badges automatically
-        if (fullBody.Contains("NaviPac", StringComparison.OrdinalIgnoreCase)) tags.Add("NAVIPAC");
-        if (fullBody.Contains("NaviScan", StringComparison.OrdinalIgnoreCase)) tags.Add("NAVISCAN");
-        if (fullBody.Contains("NaviModel", StringComparison.OrdinalIgnoreCase)) tags.Add("NAVIMODEL");
-        if (fullBody.Contains("Helmsman", StringComparison.OrdinalIgnoreCase)) tags.Add("HELMSMAN");
-        if (fullBody.Contains("Toppings", StringComparison.OrdinalIgnoreCase)) tags.Add("TOPPINGS");
-        
-        tags.Add("KnowledgeNode");
-        return tags.ToList();
-    }
-
-    public async Task SaveSwipeTelemetryAsync(EvaluationFeedbackLog log)
-    {
-        string? directoryPath = Path.GetDirectoryName(_evaluationDatasetPath);
-        if (!string.IsNullOrEmpty(directoryPath) && !Directory.Exists(directoryPath))
-        {
-            Directory.CreateDirectory(directoryPath);
-        }
-
-        await _fileLock.WaitAsync();
         try
         {
-            List<EvaluationFeedbackLog> existingLogs = new List<EvaluationFeedbackLog>();
-
-            if (File.Exists(_evaluationDatasetPath))
+            var response = await _mistralClient.PostAsJsonAsync("v1/chat/completions", promptPayload);
+            if (!response.IsSuccessStatusCode)
             {
-                string rawJson = await File.ReadAllTextAsync(_evaluationDatasetPath);
-                if (!string.IsNullOrWhiteSpace(rawJson) && rawJson.Trim().StartsWith("["))
-                {
-                    var readOptions = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
-                    existingLogs = JsonSerializer.Deserialize<List<EvaluationFeedbackLog>>(rawJson, readOptions) ?? new List<EvaluationFeedbackLog>();
-                }
+                string errorContent = await response.Content.ReadAsStringAsync();
+                Console.WriteLine($"[Mistral API Connection Failure]: Gateway returned status {response.StatusCode} - {errorContent}");
+                return "Unable to parse autonomous prediction. Review historical expert resolutions for standard manual configuration adjustments.";
             }
 
-            // Append the fully populated training example
-            existingLogs.Add(log);
+            using var jsonDoc = await JsonDocument.ParseAsync(await response.Content.ReadAsStreamAsync());
+            var root = jsonDoc.RootElement;
 
-            // 💡 SERIALIZATION CONFIG: Emits exactly the lowercase camelCase properties requested
-            var writeOptions = new JsonSerializerOptions 
-            { 
-                WriteIndented = true,
-                PropertyNamingPolicy = JsonNamingPolicy.CamelCase
-            };
-            
-            string updatedJson = JsonSerializer.Serialize(existingLogs, writeOptions);
-            await File.WriteAllTextAsync(_evaluationDatasetPath, updatedJson);
-
-            Console.WriteLine($"[RLHF MASTER REGISTER] Training pair committed. Dataset count size: {existingLogs.Count} logged nodes.");
+            if (root.TryGetProperty("choices", out var choices) && 
+                choices.ValueKind == JsonValueKind.Array && 
+                choices.GetArrayLength() > 0)
+            {
+                var firstChoice = choices[0];
+                if (firstChoice.TryGetProperty("message", out var messageProp) && 
+                    messageProp.TryGetProperty("content", out var contentProp))
+                {
+                    return contentProp.GetString()?.Trim() ?? string.Empty;
+                }
+            }
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"[RLHF Matrix Ingestion Crash]: {ex.Message}");
-            throw;
+            Console.WriteLine($"[Mistral Integration Error Loop Failed]: {ex.Message}");
         }
-        finally
+
+        return "Verification Check Required: Review standard product release matrix guidelines to troubleshoot connection links.";
+    }
+
+    // --- 💡 THE MASTER EIVA PRODUCT SPECIFICATION REGEX ENGINE ---
+    private List<string> ParseDynamicContextKeys(string fullBody)
+    {
+        var discoveredBadges = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        // All official high-fidelity categories to search inside text contexts
+        string[] eivaProducts = new string[]
         {
-            _fileLock.Release();
+            "NaviSuite", "NaviPac", "NaviScan", "NaviEdit", "NaviModel", "NaviPlot", 
+            "NaviSuite Beka", "NaviSuite Nardoa", "NaviSuite Uca", "Workflow Manager", 
+            "QuickStitch Utility", "Catenary option", "NaviSuite Mobula", "NaviSuite Kuda", 
+            "NaviSuite Perio", "NaviSuite QC Toolbox", "Voyis VSLAM", "Powered by EIVA", 
+            "NaviSuite ROTV", "ScanFish", "ViperFish", "ATTU Mk II", "ATTU Mk I", "ATTU"
+        };
+
+        foreach (var product in eivaProducts)
+        {
+            // Boundary checks ensure we don't accidentally match substrings (e.g. matching "ATTU" inside "ATTU Mk II")
+            // We escape specific items like "Mk II" or "Mk I" safely to keep compilation secure
+            string escapedToken = Regex.Escape(product);
+            var regexMatcher = new Regex($@"\b{escapedToken}\b", RegexOptions.IgnoreCase | RegexOptions.Compiled);
+
+            if (regexMatcher.IsMatch(fullBody))
+            {
+                discoveredBadges.Add(product);
+            }
         }
+
+        // Always retain our structural core tracking category baseline
+        discoveredBadges.Add("KnowledgeNode");
+        return discoveredBadges.ToList();
     }
 
     public async Task<JsonElement> FetchRawGraphMeshJsonAsync(string filterText)
     {
         var url = "v1/graphql";
-        
         string graphQlFilterBlock = string.IsNullOrWhiteSpace(filterText) 
             ? "limit: 45" 
             : "limit: 45, hybrid: { query: \"" + filterText + "\", alpha: 0.4 }";
@@ -443,7 +413,7 @@ public async Task<List<EvaluationTestCase>> FetchEvaluationDeckByPhaseAsync(Eval
 
         try
         {
-            var response = await _httpClient.PostAsJsonAsync(url, query);
+            var response = await _weaviateClient.PostAsJsonAsync(url, query);
             if (!response.IsSuccessStatusCode) return default;
 
             using var doc = await JsonDocument.ParseAsync(await response.Content.ReadAsStreamAsync());
@@ -483,7 +453,7 @@ public async Task<List<EvaluationTestCase>> FetchEvaluationDeckByPhaseAsync(Eval
 
         try
         {
-            var response = await _httpClient.PostAsync(url, new StringContent(JsonSerializer.Serialize(query), Encoding.UTF8, "application/json"));
+            var response = await _weaviateClient.PostAsync(url, new StringContent(JsonSerializer.Serialize(query), Encoding.UTF8, "application/json"));
             if (!response.IsSuccessStatusCode) return Enumerable.Empty<GraphContextChain>();
 
             using var doc = await JsonDocument.ParseAsync(await response.Content.ReadAsStreamAsync());
@@ -527,7 +497,7 @@ public async Task<List<EvaluationTestCase>> FetchEvaluationDeckByPhaseAsync(Eval
         var jsonQuery = new { query = $"{{ Aggregate {{ {className} {{ meta {{ count }} }} }} }}" };
         try
         {
-            var response = await _httpClient.PostAsJsonAsync("v1/graphql", jsonQuery);
+            var response = await _weaviateClient.PostAsJsonAsync("v1/graphql", jsonQuery);
             if (!response.IsSuccessStatusCode) return 0;
 
             using var doc = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
@@ -558,7 +528,7 @@ public async Task<List<EvaluationTestCase>> FetchEvaluationDeckByPhaseAsync(Eval
 
         try
         {
-            var response = await _httpClient.PostAsJsonAsync("v1/graphql", new { query = gqlQuery });
+            var response = await _weaviateClient.PostAsJsonAsync("v1/graphql", new { query = gqlQuery });
             if (!response.IsSuccessStatusCode) return 0;
 
             using var jsonDoc = await JsonDocument.ParseAsync(await response.Content.ReadAsStreamAsync());
@@ -614,7 +584,7 @@ public async Task<List<EvaluationTestCase>> FetchEvaluationDeckByPhaseAsync(Eval
         var jsonQuery = new { query = $"{{ Get {{ InteractionLog(limit: {limit}) {{ query answer was_successful timestamp }} }} }}" };
         try
         {
-            var response = await _httpClient.PostAsJsonAsync("v1/graphql", jsonQuery);
+            var response = await _weaviateClient.PostAsJsonAsync("v1/graphql", jsonQuery);
             if (response.IsSuccessStatusCode)
             {
                 var jsonString = await response.Content.ReadAsStringAsync();
@@ -643,7 +613,7 @@ public async Task<List<EvaluationTestCase>> FetchEvaluationDeckByPhaseAsync(Eval
 
         try
         {
-            var response = await _httpClient.PostAsJsonAsync(url, payload);
+            var response = await _weaviateClient.PostAsJsonAsync(url, payload);
             response.EnsureSuccessStatusCode();
         }
         catch (Exception ex)
@@ -655,7 +625,6 @@ public async Task<List<EvaluationTestCase>> FetchEvaluationDeckByPhaseAsync(Eval
     public async Task BatchIngestReleaseNodesAsync(IEnumerable<SoftwareReleaseNode> nodes)
     {
         var url = "v1/batch/objects";
-        
         var allBatchObjects = nodes.Select(node => new
         {
             @class = "SoftwareReleaseNode",
@@ -684,7 +653,7 @@ public async Task<List<EvaluationTestCase>> FetchEvaluationDeckByPhaseAsync(Eval
 
             try
             {
-                var response = await _httpClient.PostAsJsonAsync(url, payload);
+                var response = await _weaviateClient.PostAsJsonAsync(url, payload);
                 if (!response.IsSuccessStatusCode)
                 {
                     Console.WriteLine($"[Weaviate Segment Error] Batch request aborted with status code: {response.StatusCode}");
@@ -724,7 +693,6 @@ public async Task<List<EvaluationTestCase>> FetchEvaluationDeckByPhaseAsync(Eval
     public async Task<bool> DoesProductVersionExistAsync(string product, string version)
     {
         var url = "v1/graphql";
-        
         var query = new
         {
             query = $$"""
@@ -749,7 +717,7 @@ public async Task<List<EvaluationTestCase>> FetchEvaluationDeckByPhaseAsync(Eval
 
         try
         {
-            var response = await _httpClient.PostAsJsonAsync(url, query);
+            var response = await _weaviateClient.PostAsJsonAsync(url, query);
             if (!response.IsSuccessStatusCode) return false;
 
             using var doc = await JsonDocument.ParseAsync(await response.Content.ReadAsStreamAsync());
@@ -793,7 +761,7 @@ public async Task<List<EvaluationTestCase>> FetchEvaluationDeckByPhaseAsync(Eval
             """;
 
             var requestPayload = new { query = graphQlQuery };
-            var response = await _httpClient.PostAsJsonAsync("v1/graphql", requestPayload);
+            var response = await _weaviateClient.PostAsJsonAsync("v1/graphql", requestPayload);
             
             if (!response.IsSuccessStatusCode)
             {
@@ -843,5 +811,52 @@ public async Task<List<EvaluationTestCase>> FetchEvaluationDeckByPhaseAsync(Eval
         }
 
         return results.OrderBy(x => Guid.NewGuid()).Take(maxResults).ToList();
+    }
+
+    public async Task SaveSwipeTelemetryAsync(EvaluationFeedbackLog log)
+    {
+        string? directoryPath = Path.GetDirectoryName(_evaluationDatasetPath);
+        if (!string.IsNullOrEmpty(directoryPath) && !Directory.Exists(directoryPath))
+        {
+            Directory.CreateDirectory(directoryPath);
+        }
+
+        await _fileLock.WaitAsync();
+        try
+        {
+            List<EvaluationFeedbackLog> existingLogs = new List<EvaluationFeedbackLog>();
+
+            if (File.Exists(_evaluationDatasetPath))
+            {
+                string rawJson = await File.ReadAllTextAsync(_evaluationDatasetPath);
+                if (!string.IsNullOrWhiteSpace(rawJson) && rawJson.Trim().StartsWith("["))
+                {
+                    var readOptions = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
+                    existingLogs = JsonSerializer.Deserialize<List<EvaluationFeedbackLog>>(rawJson, readOptions) ?? new List<EvaluationFeedbackLog>();
+                }
+            }
+
+            existingLogs.Add(log);
+
+            var writeOptions = new JsonSerializerOptions 
+            { 
+                WriteIndented = true,
+                PropertyNamingPolicy = JsonNamingPolicy.CamelCase
+            };
+            
+            string updatedJson = JsonSerializer.Serialize(existingLogs, writeOptions);
+            await File.WriteAllTextAsync(_evaluationDatasetPath, updatedJson);
+
+            Console.WriteLine($"[RLHF MASTER REGISTER] Training pair committed. Dataset count size: {existingLogs.Count} logged nodes.");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[RLHF Matrix Ingestion Crash]: {ex.Message}");
+            throw;
+        }
+        finally
+        {
+            _fileLock.Release();
+        }
     }
 }

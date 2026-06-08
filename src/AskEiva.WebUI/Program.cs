@@ -206,8 +206,6 @@ builder.Services.AddHttpClient<AskEiva.Application.Graphs.Queries.GetEntityGraph
     client.DefaultRequestHeaders.Clear();
     client.DefaultRequestHeaders.Add("Authorization", $"Bearer {cleanApiKey}");
     client.DefaultRequestHeaders.Add("X-Weaviate-Api-Key", cleanApiKey);
-    
-    // 💡 THE CRITICAL FIX: Forwards your Mistral token to Weaviate for on-the-fly embedding text vectorization!
     client.DefaultRequestHeaders.Add("X-Mistral-Api-Key", cleanMistralKey);
 })
 .ConfigurePrimaryHttpMessageHandler(() => GetNetworkHandlerForEnvironment());
@@ -220,9 +218,15 @@ builder.Services.AddHttpClient<IKnowledgeRetrievalRepository, KnowledgeRetrieval
     client.DefaultRequestHeaders.Clear();
     client.DefaultRequestHeaders.Add("Authorization", $"Bearer {cleanApiKey}");
     client.DefaultRequestHeaders.Add("X-Weaviate-Api-Key", cleanApiKey);
-    
-    // 💡 THE CRITICAL FIX: Forwards your Mistral token to Weaviate for on-the-fly embedding text vectorization!
     client.DefaultRequestHeaders.Add("X-Mistral-Api-Key", cleanMistralKey);
+})
+.ConfigurePrimaryHttpMessageHandler(() => GetNetworkHandlerForEnvironment());
+
+builder.Services.AddHttpClient("MistralClient", client =>
+{
+    client.BaseAddress = new Uri("https://api.mistral.ai/");
+    client.DefaultRequestHeaders.Clear();
+    client.DefaultRequestHeaders.Add("Authorization", $"Bearer {cleanMistralKey}");
 })
 .ConfigurePrimaryHttpMessageHandler(() => GetNetworkHandlerForEnvironment());
 
