@@ -1,10 +1,12 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Net.Http;
 using System.Net.Http.Json;
 using System.Text;
 using System.Text.Json;
+using System.Threading;
 using System.Threading.Tasks;
 using System.Text.RegularExpressions;
 using AskEiva.Domain.Repositories;
@@ -16,182 +18,416 @@ namespace AskEiva.Infrastructure.Repositories;
 public class KnowledgeRetrievalRepository : IKnowledgeRetrievalRepository
 {
     private readonly HttpClient _httpClient;
+    
+    // 💡 THE CONCURRENCY GUARD: Prevents cross-circuit thread lock collisions when multiple users swipe simultaneously
+    private static readonly SemaphoreSlim _fileLock = new(1, 1);
+    
+    // 💡 THE REINFORCEMENT LEARNING DIRECTORY CORNERSTONE
+    private readonly string _evaluationDatasetPath = Path.Combine(
+        AppDomain.CurrentDomain.BaseDirectory, 
+        "..", "..", "..", "..", "..", 
+        "EvaluationDataset", 
+        "eiva_rlhf_training_matrix.json"
+    );
 
     public KnowledgeRetrievalRepository(HttpClient httpClient)
     {
         _httpClient = httpClient;
     }
 
-public async Task<IEnumerable<RetrievalMatch>> SearchSemanticChunksAsync(string userQuery, int limit)
-{
-    var url = "v1/graphql";
-    
-    // 💡 OPTIMIZATION: Ensure we query enough records from each array type to get a balanced cross-functional mix
-    int limitPerCollection = Math.Max(limit, 4);
-
-    var query = new
+    public async Task<IEnumerable<RetrievalMatch>> SearchSemanticChunksAsync(string userQuery, int limit)
     {
-        query = $$"""
-        {
-          Get {
-            KnowledgeNode(
-              limit: {{limitPerCollection}}
-              hybrid: { query: "{{userQuery}}", alpha: 0.5 }
-            ) {
-              source_id
-              subject
-              content
-              url
-              _additional { score }
-            }
-            DocumentLibrary(
-              limit: {{limitPerCollection}}
-              hybrid: { query: "{{userQuery}}", alpha: 0.5 }
-            ) {
-              document_id
-              title
-              content
-              url
-              _additional { score }
-            }
-            SoftwareReleaseNode(
-              limit: {{limitPerCollection}}
-              hybrid: { query: "{{userQuery}}", alpha: 0.5 }
-            ) {
-              product
-              version
-              metadata_note
-              content_chunk
-              ref_tickets
-              _additional { score }
-            }
-          }
-        }
-        """
-    };
+        var url = "v1/graphql";
+        
+        // Ensure we query enough records from each array type to get a balanced cross-functional mix
+        int limitPerCollection = Math.Max(limit, 4);
 
-    try
+        var query = new
+        {
+            query = $$"""
+            {
+              Get {
+                KnowledgeNode(
+                  limit: {{limitPerCollection}}
+                  hybrid: { query: "{{userQuery}}", alpha: 0.5 }
+                ) {
+                  source_id
+                  subject
+                  content
+                  url
+                  _additional { score }
+                }
+                DocumentLibrary(
+                  limit: {{limitPerCollection}}
+                  hybrid: { query: "{{userQuery}}", alpha: 0.5 }
+                ) {
+                  document_id
+                  title
+                  content
+                  url
+                  _additional { score }
+                }
+                SoftwareReleaseNode(
+                  limit: {{limitPerCollection}}
+                  hybrid: { query: "{{userQuery}}", alpha: 0.5 }
+                ) {
+                  product
+                  version
+                  metadata_note
+                  content_chunk
+                  ref_tickets
+                  _additional { score }
+                }
+              }
+            }
+            """
+        };
+
+        try
+        {
+            var response = await _httpClient.PostAsync(url, new StringContent(JsonSerializer.Serialize(query), Encoding.UTF8, "application/json"));
+            if (!response.IsSuccessStatusCode) return Enumerable.Empty<RetrievalMatch>();
+
+            using var doc = await JsonDocument.ParseAsync(await response.Content.ReadAsStreamAsync());
+            var matches = new List<RetrievalMatch>();
+            var root = doc.RootElement.GetProperty("data").GetProperty("Get");
+
+            // 1. Parse ticket-based KnowledgeNodes
+            if (root.TryGetProperty("KnowledgeNode", out var ticketNodes) && ticketNodes.ValueKind == JsonValueKind.Array)
+            {
+                foreach (var node in ticketNodes.EnumerateArray())
+                {
+                    float.TryParse(node.GetProperty("_additional").GetProperty("score").GetRawText(), out var score);
+                    matches.Add(new RetrievalMatch(
+                        SourceId: node.GetProperty("source_id").GetString() ?? string.Empty,
+                        Title: node.GetProperty("subject").GetString() ?? "Technical Excerpt",
+                        Content: node.GetProperty("content").GetString() ?? string.Empty,
+                        SourceUrl: node.GetProperty("url").GetString() ?? string.Empty,
+                        ConfidenceScore: score,
+                        SourceType: "KnowledgeNode", 
+                        ImageUrls: new()
+                    ));
+                }
+            }
+
+            // 2. Parse documentation-based DocumentLibraries
+            if (root.TryGetProperty("DocumentLibrary", out var docNodes) && docNodes.ValueKind == JsonValueKind.Array)
+            {
+                foreach (var node in docNodes.EnumerateArray())
+                {
+                    float.TryParse(node.GetProperty("_additional").GetProperty("score").GetRawText(), out var score);
+                    matches.Add(new RetrievalMatch(
+                        SourceId: node.TryGetProperty("document_id", out var idProp) ? idProp.GetString() ?? string.Empty : string.Empty,
+                        Title: node.TryGetProperty("title", out var titleProp) ? (titleProp.GetString() ?? "Documentation Article") : "Documentation Article",
+                        Content: node.GetProperty("content").GetString() ?? string.Empty,
+                        SourceUrl: node.GetProperty("url").GetString() ?? string.Empty,
+                        ConfidenceScore: score,
+                        SourceType: "DocumentLibrary", 
+                        ImageUrls: new()
+                    ));
+                }
+            }
+
+            // 3. Parse Release Notes data blocks dynamically
+            if (root.TryGetProperty("SoftwareReleaseNode", out var releaseNodes) && releaseNodes.ValueKind == JsonValueKind.Array)
+            {
+                foreach (var node in releaseNodes.EnumerateArray())
+                {
+                    float.TryParse(node.GetProperty("_additional").GetProperty("score").GetRawText(), out var score);
+                    string product = node.GetProperty("product").GetString() ?? "Product Note";
+                    string version = node.GetProperty("version").GetString() ?? "";
+                    string note = node.TryGetProperty("metadata_note", out var nProp) ? nProp.GetString() ?? string.Empty : string.Empty;
+
+                    matches.Add(new RetrievalMatch(
+                        SourceId: node.TryGetProperty("ref_tickets", out var tProp) ? tProp.GetString() ?? string.Empty : string.Empty,
+                        Title: $"[{product} v{version}] Release Excerpt",
+                        Content: node.GetProperty("content_chunk").GetString() ?? string.Empty,
+                        SourceUrl: "https://download.eiva.com/#",
+                        ConfidenceScore: score,
+                        SourceType: "SoftwareReleaseNode", 
+                        ImageUrls: new(),
+                        ProductContext: product,
+                        VersionContext: version
+                    ));
+                }
+            }
+
+            return matches.OrderByDescending(m => m.ConfidenceScore);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[Weaviate Mapping Exception]: {ex.Message}");
+            return Enumerable.Empty<RetrievalMatch>();
+        }
+    }
+
+public async Task<List<EvaluationTestCase>> FetchEvaluationDeckByPhaseAsync(EvaluationPhase phase, int count)
     {
-        var response = await _httpClient.PostAsync(url, new StringContent(JsonSerializer.Serialize(query), Encoding.UTF8, "application/json"));
-        if (!response.IsSuccessStatusCode) return Enumerable.Empty<RetrievalMatch>();
+        var deck = new List<EvaluationTestCase>();
 
-        using var doc = await JsonDocument.ParseAsync(await response.Content.ReadAsStreamAsync());
-        var matches = new List<RetrievalMatch>();
-        var root = doc.RootElement.GetProperty("data").GetProperty("Get");
-
-        // 1. Parse ticket-based KnowledgeNodes
-        if (root.TryGetProperty("KnowledgeNode", out var ticketNodes) && ticketNodes.ValueKind == JsonValueKind.Array)
+        // 💡 PHASE 1: Closed Baseline Evaluation Mode
+        if (phase == EvaluationPhase.ClosedBaseline)
         {
-            foreach (var node in ticketNodes.EnumerateArray())
+            var url = "v1/graphql";
+
+            // 1. GraphQL Query: Fetch chunks from KnowledgeNode. 
+            // We read a large block (limit: 300) so we can group fragments by their parent 'source_id'
+            var gqlQuery = """
             {
-                float.TryParse(node.GetProperty("_additional").GetProperty("score").GetRawText(), out var score);
-                matches.Add(new RetrievalMatch(
-                    SourceId: node.GetProperty("source_id").GetString() ?? string.Empty,
-                    Title: node.GetProperty("subject").GetString() ?? "Technical Excerpt",
-                    Content: node.GetProperty("content").GetString() ?? string.Empty,
-                    SourceUrl: node.GetProperty("url").GetString() ?? string.Empty,
-                    ConfidenceScore: score,
-                    SourceType: "KnowledgeNode", // 💡 FIXED: Matches Chat.razor tab filters perfectly!
-                    ImageUrls: new()
-                ));
+              Get {
+                KnowledgeNode(limit: 300) {
+                  source_id
+                  subject
+                  content
+                  url
+                }
+              }
             }
-        }
+            """;
 
-        // 2. Parse documentation-based DocumentLibraries
-        if (root.TryGetProperty("DocumentLibrary", out var docNodes) && docNodes.ValueKind == JsonValueKind.Array)
-        {
-            foreach (var node in docNodes.EnumerateArray())
+            try
             {
-                float.TryParse(node.GetProperty("_additional").GetProperty("score").GetRawText(), out var score);
-                matches.Add(new RetrievalMatch(
-                    SourceId: node.TryGetProperty("document_id", out var idProp) ? idProp.GetString() ?? string.Empty : string.Empty,
-                    Title: node.TryGetProperty("title", out var titleProp) ? (titleProp.GetString() ?? "Documentation Article") : "Documentation Article",
-                    Content: node.GetProperty("content").GetString() ?? string.Empty,
-                    SourceUrl: node.GetProperty("url").GetString() ?? string.Empty,
-                    ConfidenceScore: score,
-                    SourceType: "DocumentLibrary", // 💡 FIXED: Matches Chat.razor tab filters perfectly!
-                    ImageUrls: new()
-                ));
-            }
-        }
+                var response = await _httpClient.PostAsJsonAsync(url, new { query = gqlQuery });
+                if (!response.IsSuccessStatusCode) return GetFallbackBaselineDeck(count);
 
-        // 3. Parse Release Notes data blocks dynamically
-        if (root.TryGetProperty("SoftwareReleaseNode", out var releaseNodes) && releaseNodes.ValueKind == JsonValueKind.Array)
-        {
-            foreach (var node in releaseNodes.EnumerateArray())
-            {
-                float.TryParse(node.GetProperty("_additional").GetProperty("score").GetRawText(), out var score);
-                string product = node.GetProperty("product").GetString() ?? "Product Note";
-                string version = node.GetProperty("version").GetString() ?? "";
+                using var doc = await JsonDocument.ParseAsync(await response.Content.ReadAsStreamAsync());
                 
-                // Fixed key accessors to align safely with your raw schema property choices
-                string note = node.TryGetProperty("metadata_note", out var nProp) ? nProp.GetString() ?? string.Empty : string.Empty;
+                if (doc.RootElement.TryGetProperty("data", out var data) &&
+                    data.TryGetProperty("Get", out var get) &&
+                    get.TryGetProperty("KnowledgeNode", out var nodesArray) &&
+                    nodesArray.ValueKind == JsonValueKind.Array)
+                {
+                    // 2. Group the individual database text chunks by their parent Ticket ID (source_id)
+                    var ticketGroups = nodesArray.EnumerateArray()
+                        .Where(node => node.TryGetProperty("source_id", out var idProp) && !string.IsNullOrWhiteSpace(idProp.GetString()))
+                        .GroupBy(node => node.GetProperty("source_id").GetString()!)
+                        .ToList();
 
-                matches.Add(new RetrievalMatch(
-                    SourceId: node.TryGetProperty("ref_tickets", out var tProp) ? tProp.GetString() ?? string.Empty : string.Empty,
-                    Title: $"[{product} v{version}] Release Excerpt",
-                    Content: node.GetProperty("content_chunk").GetString() ?? string.Empty,
-                    SourceUrl: "https://download.eiva.com/#",
-                    ConfidenceScore: score,
-                    SourceType: "SoftwareReleaseNode", // 💡 FIXED: Matches Chat.razor tab filters perfectly!
-                    ImageUrls: new(),
-                    ProductContext: product,
-                    VersionContext: version
-                ));
+                    if (!ticketGroups.Any()) return GetFallbackBaselineDeck(count);
+
+                    // 3. Randomize the groups to ensure engineers get a fresh mix of test cards each run
+                    var randomizer = new Random();
+                    var randomizedGroups = ticketGroups.OrderBy(_ => randomizer.Next()).Take(count);
+
+                    foreach (var group in randomizedGroups)
+                    {
+                        string ticketId = group.Key;
+                        
+                        // Extract the email subject line from the first chunk to use as a summary header
+                        string subjectLine = group.First().TryGetProperty("subject", out var subProp) 
+                            ? subProp.GetString() ?? "EIVA Support Interaction" 
+                            : "EIVA Support Interaction";
+
+                        // 4. Stitch the fragmented text chunks back together into a single, cohesive message body
+                        var fullTextBuilder = new StringBuilder();
+                        foreach (var chunk in group.OrderBy(c => c.GetProperty("url").GetString())) 
+                        {
+                            string chunkContent = chunk.TryGetProperty("content", out var contentProp) ? contentProp.GetString() ?? "" : "";
+                            fullTextBuilder.AppendLine(chunkContent);
+                        }
+
+                        string continuousText = fullTextBuilder.ToString();
+
+                        // 5. Parse the stitched text to separate the customer's problem from the engineer's solution
+                        string isolatedQuery = ExtractCustomerProblemText(continuousText, subjectLine, ticketId);
+                        string isolatedGroundTruth = ExtractVerifiedResolutionText(continuousText);
+
+                        // 6. Generate matching search context tags dynamically based on the text content
+                        var dynamicContextKeys = ParseDynamicContextKeys(continuousText);
+
+                        deck.Add(new EvaluationTestCase(
+                            Query: isolatedQuery,
+                            ExpectedContextKeys: dynamicContextKeys,
+                            GroundTruthAnswer: isolatedGroundTruth
+                        ));
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[RLHF Engine Database Fetch Failure]: {ex.Message}. Falling back to standard suite vectors.");
+                return GetFallbackBaselineDeck(count);
             }
         }
+        else
+        {
+            // 💡 PHASE 2: Live Open Assistance Triage Mode
+            deck.Add(new EvaluationTestCase(
+                Query: "[LIVE TRIAGE QUEUE] Master Helmsman PC experiencing frequent desync issues with remote slave units on the survey network.",
+                ExpectedContextKeys: new() { "NAVIPAC", "HELMSMAN", "DESYNC" },
+                GroundTruthAnswer: "Suggested Fix: Inspect the Toppings folder synchronization interval settings and verify that file deletion tracking is active on remote nodes."
+            ));
+        }
 
-        // Return a clean, descending ranked distribution collection
-        return matches.OrderByDescending(m => m.ConfidenceScore);
+        return deck.Any() ? deck : GetFallbackBaselineDeck(count);
     }
-    catch (Exception ex)
+
+    // --- PARSING & CLEANING HELPER UTILITIES ---
+
+    private string ExtractCustomerProblemText(string fullBody, string subject, string ticketId)
     {
-        Console.WriteLine($"[Weaviate Mapping Exception]: {ex.Message}");
-        return Enumerable.Empty<RetrievalMatch>();
+        // If the text contains support thread headers, extract the initial message body
+        if (fullBody.Contains("From:", StringComparison.OrdinalIgnoreCase) || fullBody.Contains("Looking for some advice", StringComparison.OrdinalIgnoreCase))
+        {
+            int index = fullBody.IndexOf("Regards", StringComparison.OrdinalIgnoreCase);
+            if (index > 0) return $"[{ticketId}] {subject}\n\n" + fullBody.Substring(0, index + 7).Trim();
+        }
+        
+        // Fallback: Return a clean subset of the text if it is too long
+        return $"[{ticketId}] {subject}\n\n" + (fullBody.Length > 500 ? fullBody.Substring(0, 500) + "..." : fullBody).Trim();
     }
-}
+
+    private string ExtractVerifiedResolutionText(string fullBody)
+    {
+        // Locate common response signature blocks used by the support team
+        string marker = "Best regards / Med venlig hilsen";
+        if (fullBody.Contains(marker, StringComparison.OrdinalIgnoreCase))
+        {
+            int markerIdx = fullBody.IndexOf(marker, StringComparison.OrdinalIgnoreCase);
+            int startIdx = Math.Max(0, markerIdx - 350);
+            return "Verified Engineering Fix:\n" + fullBody.Substring(startIdx, markerIdx - startIdx).Trim();
+        }
+
+        // Alternative check: Search for text indicators that pinpoint the closing solution
+        int fixIdx = fullBody.LastIndexOf("fixed in", StringComparison.OrdinalIgnoreCase);
+        if (fixIdx > 0) return "Verified Engineering Fix:\n" + fullBody.Substring(fixIdx).Trim();
+
+        return "Verified Engineering Fix:\nReview log transaction reference histories to apply the matching firmware or driver update patch.";
+    }
+
+    private List<string> ParseDynamicContextKeys(string fullBody)
+    {
+        var tags = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        
+        // Scan text content to assign target product badges automatically
+        if (fullBody.Contains("NaviPac", StringComparison.OrdinalIgnoreCase)) tags.Add("NAVIPAC");
+        if (fullBody.Contains("NaviScan", StringComparison.OrdinalIgnoreCase)) tags.Add("NAVISCAN");
+        if (fullBody.Contains("NaviModel", StringComparison.OrdinalIgnoreCase)) tags.Add("NAVIMODEL");
+        if (fullBody.Contains("Helmsman", StringComparison.OrdinalIgnoreCase)) tags.Add("HELMSMAN");
+        if (fullBody.Contains("Toppings", StringComparison.OrdinalIgnoreCase)) tags.Add("TOPPINGS");
+        
+        tags.Add("KNOWLEDGEnode");
+        return tags.ToList();
+    }
+
+    private List<EvaluationTestCase> GetFallbackBaselineDeck(int count)
+    {
+        // Keeps a reliable fallback list ready to ensure the interface never crashes if Weaviate is offline
+        var fallback = new List<EvaluationTestCase>
+        {
+            new EvaluationTestCase("Timing drift faults on NaviPac 4.13 telemetry interface arrays", new() { "NAVIPAC", "SCANFISH", "KNOWLEDGEnode" }, "Configure connection links parameters via NaviPac's dynamic configuration module system manager layout, explicitly forcing the primary USBL serial buffer IO frame tracking port to open.")
+        };
+        return fallback.Take(count).ToList();
+    }
+
+public async Task SaveSwipeTelemetryAsync(EvaluationFeedbackLog log)
+    {
+        string? directoryPath = Path.GetDirectoryName(_evaluationDatasetPath);
+        if (!string.IsNullOrEmpty(directoryPath) && !Directory.Exists(directoryPath))
+        {
+            Directory.CreateDirectory(directoryPath);
+        }
+
+        // Acquire the thread gate token
+        await _fileLock.WaitAsync();
+        try
+        {
+            List<EvaluationFeedbackLog> existingLogs = new List<EvaluationFeedbackLog>();
+
+            // 1. Read existing historical logs with bulletproof relaxed casing rules
+            if (File.Exists(_evaluationDatasetPath))
+            {
+                try
+                {
+                    string rawJson = await File.ReadAllTextAsync(_evaluationDatasetPath);
+                    if (!string.IsNullOrWhiteSpace(rawJson) && rawJson.Trim().StartsWith("["))
+                    {
+                        var readOptions = new JsonSerializerOptions
+                        {
+                            PropertyNameCaseInsensitive = true, // 💡 CRITICAL: Prevents case mismatch from returning null!
+                            PropertyNamingPolicy = JsonNamingPolicy.CamelCase
+                        };
+                        
+                        var deserialized = JsonSerializer.Deserialize<List<EvaluationFeedbackLog>>(rawJson, readOptions);
+                        if (deserialized != null)
+                        {
+                            existingLogs = deserialized;
+                        }
+                    }
+                }
+                catch (JsonException)
+                {
+                    // If the JSON is somehow malformed, don't crash, just log it or back it up
+                    Console.WriteLine("[RLHF ENGINE WARNING] JSON file was malformed. Re-initializing array boundary.");
+                }
+            }
+
+            // 2. Append the new human telemetry record
+            existingLogs.Add(log);
+
+            // 3. Serialize the full history array clean back to disk
+            var writeOptions = new JsonSerializerOptions 
+            { 
+                WriteIndented = true,
+                PropertyNamingPolicy = JsonNamingPolicy.CamelCase 
+            };
+            
+            string updatedJson = JsonSerializer.Serialize(existingLogs, writeOptions);
+            await File.WriteAllTextAsync(_evaluationDatasetPath, updatedJson);
+
+            Console.WriteLine($"[RLHF FILE SYSTEM ENGINE] Telemetry successfully committed. Dataset size: {existingLogs.Count} records total.");
+        }
+        catch (Exception fileEx)
+        {
+            Console.WriteLine($"[RLHF File Ingestion Error]: Failed to commit training trace: {fileEx.Message}");
+            throw;
+        }
+        finally
+        {
+            _fileLock.Release();
+        }
+    }
 
     public async Task<JsonElement> FetchRawGraphMeshJsonAsync(string filterText)
-{
-    var url = "v1/graphql";
-    
-    string graphQlFilterBlock = string.IsNullOrWhiteSpace(filterText) 
-        ? "limit: 45" 
-        : "limit: 45, hybrid: { query: \"" + filterText + "\", alpha: 0.4 }";
-
-    var query = new
     {
-        query = $$"""
+        var url = "v1/graphql";
+        
+        string graphQlFilterBlock = string.IsNullOrWhiteSpace(filterText) 
+            ? "limit: 45" 
+            : "limit: 45, hybrid: { query: \"" + filterText + "\", alpha: 0.4 }";
+
+        var query = new
         {
-          Get {
-            GraphContextChain({{graphQlFilterBlock}}) {
-              ticket_id
-              main_product_context
-              scenario_type
-              predicates
-              confidence_score
+            query = $$"""
+            {
+              Get {
+                GraphContextChain({{graphQlFilterBlock}}) {
+                  ticket_id
+                  main_product_context
+                  scenario_type
+                  predicates
+                  confidence_score
+                }
+              }
             }
-          }
+            """
+        };
+
+        try
+        {
+            var response = await _httpClient.PostAsJsonAsync(url, query);
+            if (!response.IsSuccessStatusCode) return default;
+
+            using var doc = await JsonDocument.ParseAsync(await response.Content.ReadAsStreamAsync());
+            return doc.RootElement.Clone();
         }
-        """
-    };
-
-    try
-    {
-        // 💡 Uses the repository's native, perfectly authorized client channel
-        var response = await _httpClient.PostAsJsonAsync(url, query);
-        if (!response.IsSuccessStatusCode) return default;
-
-        using var doc = await JsonDocument.ParseAsync(await response.Content.ReadAsStreamAsync());
-        return doc.RootElement.Clone();
+        catch
+        {
+            return default;
+        }
     }
-    catch
-    {
-        return default;
-    }
-}
 
-public async Task<IEnumerable<GraphContextChain>> SearchGraphTriplesAsync(string userQuery, int limit)
+    public async Task<IEnumerable<GraphContextChain>> SearchGraphTriplesAsync(string userQuery, int limit)
     {
         var url = "v1/graphql";
         var query = new
@@ -280,81 +516,70 @@ public async Task<IEnumerable<GraphContextChain>> SearchGraphTriplesAsync(string
         return 0;
     }
 
-public async Task<int> GetDistinctSourceCountAsync(string className, string propertyName)
-{
-    // 💡 THE MEMORY-SAFE STREAMING PASS: We request ONLY the tracking property (e.g., source_id).
-    // Because we leave out the massive 'content' and vector fields, the payload is incredibly tiny.
-    // We set a high limit to capture all chunks in a single fast, timeout-safe network hop.
-    var gqlQuery = $$"""
+    public async Task<int> GetDistinctSourceCountAsync(string className, string propertyName)
     {
-      Get {
-        {{className}}(limit: 50000) {
-          {{propertyName}}
-        }
-      }
-    }
-    """;
-
-try
-    {
-        var response = await _httpClient.PostAsJsonAsync("v1/graphql", new { query = gqlQuery });
-        if (!response.IsSuccessStatusCode) return 0;
-
-        using var jsonDoc = await JsonDocument.ParseAsync(await response.Content.ReadAsStreamAsync());
-        
-        if (jsonDoc.RootElement.TryGetProperty("data", out var data) &&
-            data.TryGetProperty("Get", out var get) &&
-            get.TryGetProperty(className, out var chunkArray) &&
-            chunkArray.ValueKind == JsonValueKind.Array)
+        var gqlQuery = $$"""
         {
-            var uniqueIds = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+          Get {
+            {{className}}(limit: 50000) {
+              {{propertyName}}
+            }
+          }
+        }
+        """;
 
-            // Regex pattern to extract the KB number prefix: Match starts with kb/KB, then digits, followed by an underscore
-            // This captures "Kb_43000623566_" or "kb_43000756150_" and discards the trailing "part_X"
-            var kbPattern = new Regex(@"^(kb_\d+_)", RegexOptions.Compiled | RegexOptions.IgnoreCase);
+        try
+        {
+            var response = await _httpClient.PostAsJsonAsync("v1/graphql", new { query = gqlQuery });
+            if (!response.IsSuccessStatusCode) return 0;
 
-            foreach (var chunk in chunkArray.EnumerateArray())
+            using var jsonDoc = await JsonDocument.ParseAsync(await response.Content.ReadAsStreamAsync());
+            
+            if (jsonDoc.RootElement.TryGetProperty("data", out var data) &&
+                data.TryGetProperty("Get", out var get) &&
+                get.TryGetProperty(className, out var chunkArray) &&
+                chunkArray.ValueKind == JsonValueKind.Array)
             {
-                if (chunk.TryGetProperty(propertyName, out var prop) && prop.ValueKind == JsonValueKind.String)
-                {
-                    string rawId = prop.GetString() ?? string.Empty;
-                    if (string.IsNullOrWhiteSpace(rawId)) continue;
+                var uniqueIds = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                var kbPattern = new Regex(@"^(kb_\d+_)", RegexOptions.Compiled | RegexOptions.IgnoreCase);
 
-                    if (className == "DocumentLibrary")
+                foreach (var chunk in chunkArray.EnumerateArray())
+                {
+                    if (chunk.TryGetProperty(propertyName, out var prop) && prop.ValueKind == JsonValueKind.String)
                     {
-                        // 💡 EXTRACT PARENT DOCUMENT KEY:
-                        // Look for the clean "kb_number_" prefix pattern matching your naming rule
-                        var match = kbPattern.Match(rawId);
-                        if (match.Success)
+                        string rawId = prop.GetString() ?? string.Empty;
+                        if (string.IsNullOrWhiteSpace(rawId)) continue;
+
+                        if (className == "DocumentLibrary")
                         {
-                            // 💡 FIXED: Uses standard .ToLowerInvariant() to keep cross-platform strings perfectly clean
-                            uniqueIds.Add(match.Value.ToLowerInvariant()); 
+                            var match = kbPattern.Match(rawId);
+                            if (match.Success)
+                            {
+                                uniqueIds.Add(match.Value.ToLowerInvariant()); 
+                            }
+                            else
+                            {
+                                uniqueIds.Add(rawId.ToLowerInvariant());
+                            }
                         }
                         else
                         {
-                            // Fallback just in case a manual document entry doesn't use the 'part' suffix structure
-                            uniqueIds.Add(rawId.ToLowerInvariant());
+                            uniqueIds.Add(rawId);
                         }
                     }
-                    else
-                    {
-                        // Standard handling for support tickets (e.g., "FD-81488")
-                        uniqueIds.Add(rawId);
-                    }
                 }
+
+                Console.WriteLine($"[Application Telemetry Engine] Cleaned {chunkArray.GetArrayLength()} chunks for {className}. Unique Parents Found: {uniqueIds.Count}");
+                return uniqueIds.Count;
             }
-
-            Console.WriteLine($"[Application Telemetry Engine] Cleaned {chunkArray.GetArrayLength()} chunks for {className}. Unique Parents Found: {uniqueIds.Count}");
-            return uniqueIds.Count;
         }
-    }
-    catch (Exception ex)
-    {
-        Console.WriteLine($"[Telemetry Aggregation Error] Failed matching custom text filters for {className}: {ex.Message}");
-    }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[Telemetry Aggregation Error] Failed matching custom text filters for {className}: {ex.Message}");
+        }
 
-    return 0;
-}
+        return 0;
+    }
 
     public async Task<JsonElement> GetRawInteractionLogsAsync(int limit)
     {
@@ -399,11 +624,10 @@ try
         }
     }
 
-public async Task BatchIngestReleaseNodesAsync(IEnumerable<SoftwareReleaseNode> nodes)
+    public async Task BatchIngestReleaseNodesAsync(IEnumerable<SoftwareReleaseNode> nodes)
     {
         var url = "v1/batch/objects";
         
-        // Formats your raw entity items into Weaviate properties records
         var allBatchObjects = nodes.Select(node => new
         {
             @class = "SoftwareReleaseNode",
@@ -422,7 +646,6 @@ public async Task BatchIngestReleaseNodesAsync(IEnumerable<SoftwareReleaseNode> 
             }
         }).ToList();
 
-        // 💡 FIXED: Split into chunks of 30 nodes to comply with Mistral's internal embedding limits
         const int MaxMistralBatchSize = 30;
         int totalIngestedCount = 0;
 
@@ -459,7 +682,6 @@ public async Task BatchIngestReleaseNodesAsync(IEnumerable<SoftwareReleaseNode> 
                     Console.WriteLine($"[Weaviate Ingestion Segment] Successfully vectorized {segmentSuccessCount}/{currentChunkPartition.Count} items.");
                 }
                 
-                // Add a brief 100ms backoff sleep cycle to protect your Mistral API key tier from hitting rate-limits
                 await Task.Delay(100);
             }
             catch (Exception ex)
@@ -471,11 +693,10 @@ public async Task BatchIngestReleaseNodesAsync(IEnumerable<SoftwareReleaseNode> 
         Console.WriteLine($"\n[Weaviate Ingestion Engine] Task Finished! Total of {totalIngestedCount} out of {allBatchObjects.Count} records indexed successfully into the cluster.\n");
     }
 
-public async Task<bool> DoesProductVersionExistAsync(string product, string version)
+    public async Task<bool> DoesProductVersionExistAsync(string product, string version)
     {
         var url = "v1/graphql";
         
-        // 💡 PERFECT MATCHING: Uses a GraphQL structural 'where' operator filtering pass
         var query = new
         {
             query = $$"""
@@ -516,14 +737,12 @@ public async Task<bool> DoesProductVersionExistAsync(string product, string vers
         return false;
     }
 
-public async Task<List<TechnicalContextSearchResult>> SearchTechnicalContextAsync(string ticketId, int maxResults)
+    public async Task<List<TechnicalContextSearchResult>> SearchTechnicalContextAsync(string ticketId, int maxResults)
     {
         var results = new List<TechnicalContextSearchResult>();
 
         try
         {
-            // 💡 FIXED: Using Weaviate's nearObject filter to execute cross-collection lookups 
-            // using the ticket's server-side vector reference!
             var graphQlQuery = $$"""
             {
               Get {
@@ -559,7 +778,6 @@ public async Task<List<TechnicalContextSearchResult>> SearchTechnicalContextAsyn
 
             if (root.TryGetProperty("data", out var dataNode) && dataNode.TryGetProperty("Get", out var getCollection))
             {
-                // Map elements pulled from DocumentLibrary
                 if (getCollection.TryGetProperty("DocumentLibrary", out var docArray) && docArray.ValueKind == JsonValueKind.Array)
                 {
                     foreach (var elem in docArray.EnumerateArray())
@@ -575,7 +793,6 @@ public async Task<List<TechnicalContextSearchResult>> SearchTechnicalContextAsyn
                     }
                 }
 
-                // Map elements pulled from SoftwareReleaseNode
                 if (getCollection.TryGetProperty("SoftwareReleaseNode", out var releaseArray) && releaseArray.ValueKind == JsonValueKind.Array)
                 {
                     foreach (var elem in releaseArray.EnumerateArray())

@@ -8,6 +8,16 @@ using System.Threading.Tasks;
 
 namespace AskEiva.Domain.Repositories;
 
+
+public enum EvaluationPhase
+{
+    ClosedBaseline, // Historical verified resolutions
+    LiveOpenAssist  // Fresh triage items
+}
+
+public record EvaluationTestCase(string Query, List<string> ExpectedContextKeys, string GroundTruthAnswer);
+
+
 public interface IKnowledgeRetrievalRepository
 {
     Task<IEnumerable<RetrievalMatch>> SearchSemanticChunksAsync(string userQuery, int limit);
@@ -20,6 +30,8 @@ public interface IKnowledgeRetrievalRepository
     Task BatchIngestReleaseNodesAsync(IEnumerable<SoftwareReleaseNode> nodes);
     Task<bool> DoesProductVersionExistAsync(string product, string version);
     Task<List<TechnicalContextSearchResult>> SearchTechnicalContextAsync(string ticketId, int maxResults);
+    Task<List<EvaluationTestCase>> FetchEvaluationDeckByPhaseAsync(EvaluationPhase phase, int count);
+    Task SaveSwipeTelemetryAsync(EvaluationFeedbackLog log);
 }
 
 public class TechnicalContextSearchResult

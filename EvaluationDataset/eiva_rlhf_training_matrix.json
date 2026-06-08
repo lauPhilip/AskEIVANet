@@ -1,0 +1,29 @@
+[
+  {
+    "id": "96ba89a8-064d-4747-a912-28cd561bbd15",
+    "query": "[FD-72071] Navipac Pro Licenses\n\n[Historical Support Log Asset | Token ID: FD-72071]\n=== TICKET OPENED: Navipac Pro Licenses ===\r\nHi,\n\nIs there a limit to how many Navipac Pro Licenses that can be used at one time on the same network?\n\nRegards,\n\nCOLIN BUTLER, C.L.S., N.L.S.\nSurvey \u0026 Positioning Manager\n\nDOF Subsea\nMain: \u002B1 709 606 2055\nDirect (Teams): \u002B1 709 606 2055\nMobile: \u002B1 709 468 0151\nEmail: colin.butler@dof.com\u003Cmailto:colin.butler@dof.com\u003E\n\nwww.dof.com\u003Chttp://www.dof.com/\u003E\n\n P Please consider the environment before print...",
+    "proposedAnswer": "Verified Engineering Fix:\nlin.butler@dof.com\u003Cmailto:colin.butler@dof.com\u003E\n\nwww.dof.com\u003Chttp://www.dof.com/\u003E\n\n P Please consider the environment before printing this e-mail\r\n\n--- Reply by AGENT on 06-01-2025 18:36:50 ---\r\nHello Colin, Not so sure if there is a limitation on how many Navipac Pro licenses can be used on the same network. \u200BIf you can try this it would be nice.",
+    "isApproved": true,
+    "correctionNotes": "The answer was okay, but they shouldve known the limitation of licenses",
+    "phase": "ClosedBaseline",
+    "loggedAt": "2026-06-08T09:13:44.2946523Z"
+  },
+  {
+    "id": "1cdcd1d7-c52e-4082-9064-77a455c84771",
+    "query": "[FD-63233] geotiff export\n\n[Historical Support Log Asset | Token ID: FD-63233]\n=== TICKET OPENED: geotiff export ===\r\nHello,\n\nI\u0027m emailing you because I need some support with geotiff export\n\nI\u0027m having problem in exporting a SLOPE geotiff because when I do the export, even if the surface db Is set in SLOPE color mode, the export ends up in a normal DEPTH geotiff and I cannot complete the export.\n\nI have tried to export from chart, and it doesn\u0027t work. I tried creating the outline, but this doesn\u0027t work too and, in the en...",
+    "proposedAnswer": "Verified Engineering Fix:\nconfirmation from an authorised representative of its contents. No guarantee is implied that this message or any attachment is virus free or has not been intercepted and amended.\r\n\n--- Reply by AGENT on 27-02-2024 00:07:09 ---\r\nHello Star, Can you try our latest version of Navimodel? You can download it to our website:\u00A0https://download.eiva.com/#",
+    "isApproved": true,
+    "correctionNotes": "Good reponse with a follow up of asking to try the lastest version of the navimodel",
+    "phase": "ClosedBaseline",
+    "loggedAt": "2026-06-08T09:17:33.5135515Z"
+  },
+  {
+    "id": "440f96b6-4997-44cf-87be-7b2ff8c69ee5",
+    "query": "[FD-76000] RE: Ivero Viperfish Malfunction - (Probably Motor \u002B Re-Termination) - 20250255\n\n[Historical Support Log Asset | Token ID: FD-76000]\nfeedback on the port motor after the preflight check is performed.\n\nReplacement of spare bow motor:\nIf you need to exchange the motor you can follow steps below. Remember to power off the system.\n\n 1. 142000881-1.0 (unmount pos. 1, 8, 9, 11, 12, 13)\n 2. 142000881-1.0 (remove pos. 7 by unplugging the motor cable with 5 pin. connector)\n 3. 142000882-1.0 (Remove pos 1 and replace with spare motor)\n 4. Assemble using reverse steps\n 5. Power on and ...",
+    "proposedAnswer": "Verified Engineering Fix:\nfollow steps below. Remember to power off the system.\n\n 1. 142000881-1.0 (unmount pos. 1, 8, 9, 11, 12, 13)\n 2. 142000881-1.0 (remove pos. 7 by unplugging the motor cable with 5 pin. connector)\n 3. 142000882-1.0 (Remove pos 1 and replace with spare motor)\n 4. Assemble using reverse steps\n 5. Power on and perform preflight check and await approval",
+    "isApproved": true,
+    "correctionNotes": "",
+    "phase": "ClosedBaseline",
+    "loggedAt": "2026-06-08T09:22:15.7266591Z"
+  }
+]

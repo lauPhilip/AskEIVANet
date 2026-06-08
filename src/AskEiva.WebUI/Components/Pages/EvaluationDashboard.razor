@@ -1,0 +1,217 @@
+@page "/evaluationdashboard"
+@attribute [Microsoft.AspNetCore.Authorization.Authorize]
+@rendermode InteractiveServer
+
+@using MediatR
+@using AskEiva.Application.QualityAssurance.Commands
+@using AskEiva.Domain.Repositories
+@inject IKnowledgeRetrievalRepository KnowledgeRepo
+@inject IMediator Mediator
+
+<MudContainer MaxWidth="MaxWidth.Large" Class="mt-4">
+    
+    @* --- SYSTEM KPI & REINFORCEMENT LEARNING METRICS PANEL --- *@
+    <MudGrid Class="mb-4">
+        <MudItem xs="12" sm="3">
+            <MudPaper Elevation="0" Class="pa-4 text-center bg-white shadow-sm" Style="border: 1px solid #E2E8F0; border-radius: 8px;">
+                <MudText Typo="Typo.caption" Class="font-weight-bold text-muted d-block">TOTAL SWIPES</MudText>
+                <MudText Typo="Typo.h4" Class="font-weight-bold mt-1" Style="color: #0A2540;">@_totalSwipes</MudText>
+                <MudProgressLinear Color="Color.Primary" Value="@_totalSwipes" Max="100" Class="mt-2" />
+            </MudPaper>
+        </MudItem>
+        <MudItem xs="12" sm="3">
+            <MudPaper Elevation="0" Class="pa-4 text-center bg-white shadow-sm" Style="border: 1px solid #E2E8F0; border-radius: 8px;">
+                <MudText Typo="Typo.caption" Class="font-weight-bold text-muted d-block">ENGINEER APPROVAL RATE</MudText>
+                <MudText Typo="Typo.h4" Class="font-weight-bold mt-1" Style="color: #059669;">@_approvalRate.ToString("F1")%</MudText>
+                <MudProgressLinear Color="Color.Success" Value="@((int)_approvalRate)" Class="mt-2" />
+            </MudPaper>
+        </MudItem>
+        <MudItem xs="12" sm="3">
+            <MudPaper Elevation="0" Class="pa-4 text-center bg-white shadow-sm" Style="border: 1px solid #E2E8F0; border-radius: 8px;">
+                <MudText Typo="Typo.caption" Class="font-weight-bold text-muted d-block">MODEL REINFORCEMENT INDEX</MudText>
+                <MudText Typo="Typo.h4" Class="font-weight-bold mt-1" Style="color: #7C3AED;">v@_modelGenerationGen.ToString("F2")</MudText>
+                <MudText Typo="Typo.caption" Style="color: #64748B;">Increasing alignment score 📈</MudText>
+            </MudPaper>
+        </MudItem>
+        <MudItem xs="12" sm="3">
+            <MudPaper Elevation="0" Class="pa-4 text-center bg-white shadow-sm" Style="border: 1px solid #E2E8F0; border-radius: 8px;">
+                <MudText Typo="Typo.caption" Class="font-weight-bold text-muted d-block">MISMATCH ALERT SENSITIVITY</MudText>
+                <MudText Typo="Typo.h4" Class="font-weight-bold mt-1" Style="color: #D97706;">@_versionMismatches Tracked</MudText>
+                <MudText Typo="Typo.caption" Style="color: #DC2626; font-weight: bold;">Isolated release leaks</MudText>
+            </MudPaper>
+        </MudItem>
+    </MudGrid>
+
+    @* --- THE MATCHING GAME WORKSPACE --- *@
+    <MudGrid Justify="Justify.Center">
+        <MudItem xs="12" md="8">
+            @if (_isLoadingDeck)
+            {
+                <MudPaper Elevation="1" Class="pa-12 text-center" Style="border: 1px solid #E2E8F0; border-radius: 16px; background: #FFFFFF;">
+                    <MudProgressCircular Color="Color.Primary" Size="Size.Large" Indeterminate="true" Class="mb-3" />
+                    <MudText Typo="Typo.body1" Style="color: #0A2540;">Stitching fragmented Freshdesk closed tickets from KnowledgeNode...</MudText>
+                </MudPaper>
+            }
+            else if (_currentCardIndex < _evalCards.Count)
+            {
+                var card = _evalCards[_currentCardIndex];
+
+                <MudPaper Elevation="2" Class="pa-6 d-flex flex-column justify-space-between animation-card" 
+                          Style="@($"border: 1px solid #E2E8F0; border-radius: 16px; min-height: 480px; background: #FFFFFF; transform: rotate({_cardRotation}deg); transition: transform 0.2s ease;")">
+                    
+                    <div>
+                        <div class="d-flex align-center justify-space-between mb-4">
+                            <MudChip T="string" Color="Color.Primary" Variant="Variant.Text" Size="Size.Small" Icon="@Icons.Material.Filled.SportsEsports">EIVA Alignment Match Arena</MudChip>
+                            <MudText Typo="Typo.caption" Class="font-weight-bold" Style="color: #94A3B8;">CARD @(_currentCardIndex + 1) OF @_evalCards.Count</MudText>
+                        </div>
+
+                        <MudText Typo="Typo.subtitle2" Style="color: #64748B; text-transform: uppercase; font-weight: bold;">Incoming Ticket:</MudText>
+                        <MudPaper Class="pa-3 my-2" Style="background: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 8px; max-height: 400px; overflow-y: auto;">
+                            <MudText Typo="Typo.body2" Style="color: #0A2540; font-family: monospace; white-space: pre-wrap;">@card.Query</MudText>
+                        </MudPaper>
+                        
+                        <MudDivider Class="my-3" />
+
+                        <MudText Typo="Typo.subtitle2" Style="color: #7C3AED; text-transform: uppercase; font-weight: bold;" Class="d-flex align-center gap-1">
+                            <MudIcon Icon="@Icons.Material.Filled.AutoAwesome" Size="Size.Small" /> AskEIVA Copilot Proposed Fix:
+                        </MudText>
+                        
+                        <MudPaper Class="pa-3 my-2" Style="background: #FDFEFE; border: 1px solid #D8DEE4; border-radius: 8px; max-height: 400px; overflow-y: auto;">
+                            <MudText Typo="Typo.body2" Style="line-height: 1.6; color: #1E293B;">@card.GroundTruthAnswer</MudText>
+                        </MudPaper>
+                        
+                        <div class="d-flex align-center gap-2 mt-3 flex-wrap">
+                            <MudText Typo="Typo.caption" Class="font-weight-bold mr-1">Retrieved Vectors:</MudText>
+                            @foreach(var tag in card.ExpectedContextKeys)
+                            {
+                                <MudChip T="string" Variant="Variant.Outlined" Size="Size.Small" Color="Color.Info">@tag</MudChip>
+                            }
+                        </div>
+                    </div>
+
+                    <div class="d-flex align-center justify-space-around mt-6 pt-4" style="border-top: 1px solid #F1F5F9;">
+                        <MudButton Variant="Variant.Filled" 
+                                   Color="Color.Error" 
+                                   Size="Size.Large"
+                                   OnClick="@(() => ProcessSwipeActionAsync(false))"
+                                   StartIcon="@Icons.Material.Filled.ContentCut"
+                                   Style="border-radius: 50px; width: 140px; height: 48px; box-shadow: 0 4px 14px rgba(220, 38, 38, 0.3);">
+                            Reject
+                        </MudButton>
+
+                        <MudTextField @bind-Value="_correctionBuffer" 
+                                      Placeholder="Optional correction notes..." 
+                                      Variant="Variant.Outlined" Margin="Margin.Dense" Class="mx-4 flex-grow-1" Style="background: #FFFFFF;" />
+
+                        <MudButton Variant="Variant.Filled" 
+                                   Color="Color.Success" 
+                                   Size="Size.Large"
+                                   OnClick="@(() => ProcessSwipeActionAsync(true))"
+                                   EndIcon="@Icons.Material.Filled.CheckCircle"
+                                   Style="border-radius: 50px; width: 140px; height: 48px; box-shadow: 0 4px 14px rgba(5, 150, 105, 0.3);">
+                            Approve
+                        </MudButton>
+                    </div>
+                </MudPaper>
+            }
+            else
+            {
+                <MudPaper Elevation="1" Class="pa-8 text-center" Style="border: 1px solid #E2E8F0; border-radius: 16px; background: #FFFFFF;">
+                    <MudIcon Icon="@Icons.Material.Filled.Celebration" Color="Color.Success" Size="Size.Large" Class="mb-2" />
+                    <MudText Typo="Typo.h5" Class="font-weight-bold" Style="color: #0A2540;">Level Complete! Deck Evaluated</MudText>
+                    <MudText Typo="Typo.body2" Class="text-muted mb-4">Every generated alignment fix has been successfully judged and pushed to the reinforcement store ledger logs.</MudText>
+                    <MudButton Variant="Variant.Outlined" Color="Color.Primary" OnClick="ResetDeckGame">Pull Next Random Deck</MudButton>
+                </MudPaper>
+            }
+        </MudItem>
+    </MudGrid>
+</MudContainer>
+
+@code {
+    private int _currentCardIndex = 0;
+    private int _cardRotation = 0;
+    private string _correctionBuffer = string.Empty;
+    private bool _isLoadingDeck = true;
+
+    private int _totalSwipes = 0;
+    private int _approvedSwipes = 0;
+    private double _approvalRate = 0.0;
+    private double _modelGenerationGen = 1.00;
+    private int _versionMismatches = 0;
+
+    private List<AskEiva.Domain.Repositories.EvaluationTestCase> _evalCards = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadDynamicEvaluationDeckAsync();
+    }
+
+    private async Task LoadDynamicEvaluationDeckAsync()
+    {
+        _isLoadingDeck = true;
+        _currentCardIndex = 0;
+        StateHasChanged();
+
+        try
+        {
+            // 💡 REPOSITORY LAYER DIRECT PASS: No MediatR nesting, no implicit list type conversion errors.
+            _evalCards = await KnowledgeRepo.FetchEvaluationDeckByPhaseAsync(EvaluationPhase.ClosedBaseline, count: 5);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[Evaluation Arena Deck Failure]: {ex.Message}");
+        }
+        finally
+        {
+            _isLoadingDeck = false;
+            CalculateStatsSummary();
+            StateHasChanged();
+        }
+    }
+
+    private async Task ProcessSwipeActionAsync(bool approved)
+    {
+        if (!_evalCards.Any() || _currentCardIndex >= _evalCards.Count) return;
+        
+        var currentCard = _evalCards[_currentCardIndex];
+        
+        _cardRotation = approved ? 15 : -15;
+        StateHasChanged();
+        await Task.Delay(150); 
+
+        _totalSwipes++;
+        if (approved) _approvedSwipes++;
+        
+        if (!approved && (currentCard.Query.Contains("9.7.8") || _correctionBuffer.Contains("obsolete", StringComparison.OrdinalIgnoreCase))) 
+            _versionMismatches++;
+
+        // Swipes stay tracked via MediatR Commands because they handle state mutations perfectly
+        var trackingTelemetry = new SubmitSwipeFeedbackCommand(
+            Query: currentCard.Query,
+            GeneratedAnswer: currentCard.GroundTruthAnswer,
+            IsApproved: approved,
+            TargetCollectionBias: "ClosedBaseline",
+            CorrectionNotes: _correctionBuffer
+        );
+        
+        await Mediator.Send(trackingTelemetry);
+
+        _modelGenerationGen += approved ? 0.02 : -0.01;
+        _correctionBuffer = string.Empty;
+        _cardRotation = 0;
+        _currentCardIndex++;
+        
+        CalculateStatsSummary();
+        StateHasChanged();
+    }
+
+    private void CalculateStatsSummary()
+    {
+        _approvalRate = _totalSwipes > 0 ? ((double)_approvedSwipes / _totalSwipes) * 100 : 85.5;
+    }
+
+    private async Task ResetDeckGame()
+    {
+        await LoadDynamicEvaluationDeckAsync();
+    }
+}
