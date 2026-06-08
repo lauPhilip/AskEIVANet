@@ -6,7 +6,9 @@
     "isApproved": true,
     "correctionNotes": "The answer was okay, but they shouldve known the limitation of licenses",
     "phase": "ClosedBaseline",
-    "loggedAt": "2026-06-08T09:13:44.2946523Z"
+    "loggedAt": "2026-06-08T09:13:44.2946523Z",
+    "groundTruth": "",
+    "context": []
   },
   {
     "id": "1cdcd1d7-c52e-4082-9064-77a455c84771",
@@ -15,7 +17,9 @@
     "isApproved": true,
     "correctionNotes": "Good reponse with a follow up of asking to try the lastest version of the navimodel",
     "phase": "ClosedBaseline",
-    "loggedAt": "2026-06-08T09:17:33.5135515Z"
+    "loggedAt": "2026-06-08T09:17:33.5135515Z",
+    "groundTruth": "",
+    "context": []
   },
   {
     "id": "440f96b6-4997-44cf-87be-7b2ff8c69ee5",
@@ -24,6 +28,30 @@
     "isApproved": true,
     "correctionNotes": "",
     "phase": "ClosedBaseline",
-    "loggedAt": "2026-06-08T09:22:15.7266591Z"
+    "loggedAt": "2026-06-08T09:22:15.7266591Z",
+    "groundTruth": "",
+    "context": []
+  },
+  {
+    "id": "FD-75943",
+    "query": "[FD-75943] Navipac Online - Priority problem on DGPS\n\n[Historical Support Log Asset | Token ID: FD-75943]\n=== TICKET OPENED: Navipac Online - Priority problem on DGPS ===\r\nGood morning, Support Team\n\nSome days ago, when we started Navipac as we usually do, we notice that the software didn\u0027t recognize when we selected our \u0022Position Systems\u0022 on \u0022Navipac Online\u0022.\nThe DGPS system were only enable after restarting Navipac several times and changing the modes \u0022Combined\u0022 and \u0022Prioritised\u0022 on \u0022Positioning System\u0022.\n\nAfter \u0022solving\u0022 this first problem we noticed that on \u0022Prioritised\u0022 mode, the software shows that we have some problem on our DGPS (Online Botom is yellow), and several information regarding to Vessel are shown in Red status\u0022. But we don\u0027t have problem on DGPS because we can see the datas coming using the \u0022Instrument Spy\u0022 or \u0022Raw\u0022 data applications.\n\n[cid:c3d63016-ecf1-4bdd-91f5-23f8de8552ea]\n\nOn this mode, the application \u0022Log Data\u0022 works well and register the datas from the DGPS as you can see on image below\n\n[cid:d4a4bafa-939b-4e28-a2cd-bff2a0e31a0c]\n\nBut when we change the mode to \u0022Combined\u0022 , the software shows that we have no problem on DGPS (Online Botom is green), and Vessel status are normal. But now the application \u0022Log Data\u0022 it unstable and sometimes doesn\u0027t register the datas from the DGPS as you can see on image below.\n\n[cid:4d7566ba-4ddf-4265-901a-4825459c9722]\nCan you help us?\nLet us know if something is missing.\n\nKind Regards,\n\nSidharta Pereira (06:00-18:00 UTC-4)\nAlessandra Castiglione (06:00 -18:00 UTC-4)\n\nSearcher Surveyor\n\nE-mail: searcher-surveyor@argeo.no\u003Cmailto:searcher-super@argeo.no\u003E\n\nWeb: www.argeo.no\u003Chttp://www.argeo.no/\u003E\n\n[Argeo_logo_deep purple]",
+    "proposedAnswer": "Proposed Fix: Configure baseline communication bindings down to alternative virtual port addresses or apply firmware updates matching your hardware profile layout constraints.",
+    "isApproved": true,
+    "correctionNotes": "",
+    "phase": "ClosedBaseline",
+    "loggedAt": "2026-06-08T12:12:47.9263057Z",
+    "groundTruth": "--- Reply by AGENT on 17-06-2025 11:03:57 ---\r\nHello Searcher, \u200BThe problem is with your DOP which is huge (5 meters). \u200BI would check where the vessel is located, if the antennas are not blocked by high structures or bulidings. Best regards / Med venlig hilsen \u00A0\u00A0 \u00A0 EIVA Support Team - Iulian \u00A0 Tel: \u00A0 \u00A0 \u002B45 7215 0505 (24/7) Email: support@eiva.com \u00A0 Helpdesk Portal\u00A0|\u00A0eLearning website\u00A0|\u00A0Training website\u00A0|\u00A0Software download\u00A0|\u00A0My EIVA\u00A0 EIVA a/s \u00A0\u2022 \u00A0Niels Bohrs Vej 17 \u00A0\u2022 \u00A08660 Skanderborg \u00A0\u2022 \u00A0Denmark \u00A0\u2022 \u00A0eiva.com\r\n\n--- Reply by CUSTOMER on 17-06-2025 13:07:06 ---\r\nThank you for your Reply.\n\nNow,, our DGPS correction is off.\n\nSo, basically Navipac will not work (log) correct because we don\u0027t have the correction enable, is that true?\n\nKind Regards,\n\nSidharta Pereira (06:00-18:00 UTC-4)\nAlessandra Castiglione (06:00 -18:00 UTC-4)\n\nSearcher Surveyor\n\nE-mail: searcher-surveyor@argeo.no\u003Cmailto:searcher-super@argeo.no\u003E\n\nWeb: www.argeo.no\u003Chttp://www.argeo.no/\u003E\n\n[Argeo_logo_deep purple]\n\n________________________________\r\n\n--- Reply by AGENT on 17-06-2025 13:21:48 ---\r\nHello Searcher, \u200BYes, it is true. Best regards / Med venlig hilsen \u00A0\u00A0 \u00A0 EIVA Support Team - Iulian \u00A0 Tel: \u00A0 \u00A0 \u002B45 7215 0505 (24/7) Email: support@eiva.com \u00A0 Helpdesk Portal\u00A0|\u00A0eLearning website\u00A0|\u00A0Training website\u00A0|\u00A0Software download\u00A0|\u00A0My EIVA\u00A0 EIVA a/s \u00A0\u2022 \u00A0Niels Bohrs Vej 17 \u00A0\u2022 \u00A08660 Skanderborg \u00A0\u2022 \u00A0Denmark \u00A0\u2022 \u00A0eiva.com",
+    "context": []
+  },
+  {
+    "id": "FD-79127",
+    "query": "[FD-79127] Helmsman Vehicle Update Rate - Enshore\n\n[Historical Support Log Asset | Token ID: FD-79127]\n=== TICKET OPENED: Helmsman Vehicle Update Rate - Enshore ===\r\nHi,\n\nI am having some issues with the Helmsman display. The position string comes into NaviPac at 20Hz, but the movement of the vehicle still looks to only refresh once a second. How can I speed this up?\n\nKind Regards\nFrank Ryding\nEnshore Subsea\nEmail: fryding@enshoresubsea.com\nWeb: www.enshoresubsea.com\nThis email is from Enshore Subsea Limited a company registered in England and Wales under Company Number 13146439 and trading under the name \u0022Enshore Subsea\u0022. Registered Address: Enshore Subsea South Harbour, Port Of Blyth, Blyth, United Kingdom, NE24 3PB. VAT Number: 372 6474 76.\nThis email may contain intellectual property, confidential, commercially sensitive or privileged information. It is for use by the intended recipient(s) only. If you have received it in error, please reply to the Sender and delete all copies.\nIt is your responsibility to conduct your own virus checks on all parts of this email and we do not accept any responsibility for loss or damage arising in any way from receipt, opening or use of this email and/or any attachments.\nWe do not accept service by email. No binding contract will result from this email until such time as a written document is signed by an authorised signatory acting on behalf of Enshore Subsea.",
+    "proposedAnswer": "Proposed Fix: Configure baseline communication bindings down to alternative virtual port addresses or apply firmware updates matching your hardware profile layout constraints.",
+    "isApproved": true,
+    "correctionNotes": "",
+    "phase": "ClosedBaseline",
+    "loggedAt": "2026-06-08T12:13:37.7058961Z",
+    "groundTruth": "--- Reply by AGENT on 26-11-2025 08:59:19 ---\r\nHello Frank What is your NaviPac version? What is your NaviPac cycle ? If you have it at 1 second that is why it is updating every 1 second despite the GPS coming in at 20Hz. I don\u0027t advice you to go for a cycle that high. \u00A0 Best regards \u00A0\u00A0 \u00A0 EIVA Helpdesk Team\u00A0\u2013\u00A0Cristian \u00A0 Tel: \u00A0 \u00A0 \u002B45 7215 0505 (24/7) Email:\u00A0support@eiva.com \u00A0 Helpdesk Portal\u00A0|\u00A0eLearning website\u00A0|\u00A0Training website\u00A0|\u00A0Software download\u00A0|\u00A0My EIVA\u00A0 EIVA a/s \u00A0\u2022 \u00A0Niels Bohrs Vej 17 \u00A0\u2022 \u00A08660 Skanderborg \u00A0\u2022 \u00A0Denmark \u00A0\u2022\u00A0\u00A0eiva.com\r\n\n--- Reply by CUSTOMER on 26-11-2025 09:04:06 ---\r\nNaviPac version 4.6.8 Internal. Using it for the custom Rapidscan Driver that was developed for us earlier this year\n\nKind Regards\nFrank Ryding\nEnshore Subsea\nEmail: fryding@enshoresubsea.com\nWeb: www.enshoresubsea.com\nThis email is from Enshore Subsea Limited a company registered in England and Wales under Company Number 13146439 and trading under the name \u0022Enshore Subsea\u0022. Registered Address: Enshore Subsea South Harbour, Port Of Blyth, Blyth, United Kingdom, NE24 3PB. VAT Number: 372 6474 76.\nThis email may contain intellectual property, confidential, commercially sensitive or privileged information. It is for use by the intended recipient(s) only. If you have received it in error, please reply to the Sender and delete all copies.\nIt is your responsibility to conduct your own virus checks on all parts of this email and we",
+    "context": []
   }
 ]

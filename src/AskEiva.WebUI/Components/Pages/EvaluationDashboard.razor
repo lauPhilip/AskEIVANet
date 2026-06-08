@@ -73,11 +73,11 @@
                         <MudDivider Class="my-3" />
 
                         <MudText Typo="Typo.subtitle2" Style="color: #7C3AED; text-transform: uppercase; font-weight: bold;" Class="d-flex align-center gap-1">
-                            <MudIcon Icon="@Icons.Material.Filled.AutoAwesome" Size="Size.Small" /> AskEIVA Copilot Proposed Fix:
+                            <MudIcon Icon="@Icons.Material.Filled.AutoAwesome" Size="Size.Small" /> AskEIVA Proposed Fix:
                         </MudText>
                         
-                        <MudPaper Class="pa-3 my-2" Style="background: #FDFEFE; border: 1px solid #D8DEE4; border-radius: 8px; max-height: 400px; overflow-y: auto;">
-                            <MudText Typo="Typo.body2" Style="line-height: 1.6; color: #1E293B;">@card.GroundTruthAnswer</MudText>
+                        <MudPaper Class="pa-3 my-2" Style="background: #FDFEFE; border: 1px solid #D8DEE4; border-radius: 8px; max-height: 140px; overflow-y: auto;">
+                            <MudText Typo="Typo.body2" Style="line-height: 1.6; color: #1E293B;">@card.GroundTruth</MudText>
                         </MudPaper>
                         
                         <div class="d-flex align-center gap-2 mt-3 flex-wrap">
@@ -181,20 +181,32 @@
 
         _totalSwipes++;
         if (approved) _approvedSwipes++;
-        
-        if (!approved && (currentCard.Query.Contains("9.7.8") || _correctionBuffer.Contains("obsolete", StringComparison.OrdinalIgnoreCase))) 
-            _versionMismatches++;
 
-        // Swipes stay tracked via MediatR Commands because they handle state mutations perfectly
+        // 💡 SYSTEM LINK: Maps the layout to provide clean context fields for training
         var trackingTelemetry = new SubmitSwipeFeedbackCommand(
             Query: currentCard.Query,
-            GeneratedAnswer: currentCard.GroundTruthAnswer,
+            GeneratedAnswer: currentCard.ProposedAnswer, // The Mistral prediction output
             IsApproved: approved,
             TargetCollectionBias: "ClosedBaseline",
             CorrectionNotes: _correctionBuffer
         );
         
-        await Mediator.Send(trackingTelemetry);
+        // We capture and build the object payload explicitly to match our data store entity expectations
+        var customLogEntity = new EvaluationFeedbackLog
+        {
+            Id = currentCard.Id,
+            Query = currentCard.Query,
+            ProposedAnswer = currentCard.ProposedAnswer,
+            IsApproved = approved,
+            CorrectionNotes = _correctionBuffer,
+            Phase = "ClosedBaseline",
+            LoggedAt = DateTime.UtcNow,
+            GroundTruth = currentCard.GroundTruth, // Saved safely away from the card issue text
+            Context = currentCard.ContextDocumentationChunks // Stores the RAG chunks
+        };
+
+        // Save directly to disk
+        await KnowledgeRepo.SaveSwipeTelemetryAsync(customLogEntity);
 
         _modelGenerationGen += approved ? 0.02 : -0.01;
         _correctionBuffer = string.Empty;

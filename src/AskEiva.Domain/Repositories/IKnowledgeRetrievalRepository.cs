@@ -15,7 +15,14 @@ public enum EvaluationPhase
     LiveOpenAssist  // Fresh triage items
 }
 
-public record EvaluationTestCase(string Query, List<string> ExpectedContextKeys, string GroundTruthAnswer);
+public record EvaluationTestCase(
+    string Id,
+    string Query,
+    string ProposedAnswer,
+    string GroundTruth,
+    List<string> ExpectedContextKeys,
+    List<string> ContextDocumentationChunks
+);
 
 
 public interface IKnowledgeRetrievalRepository
