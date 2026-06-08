@@ -1,7 +1,176 @@
 ﻿@page "/"
+@rendermode InteractiveServer
 
-<PageTitle>Home</PageTitle>
+@using AskEiva.Domain.Repositories
+@inject IKnowledgeRetrievalRepository KnowledgeRepo
+@inject NavigationManager Navigation
 
-<h1>Hello, world!</h1>
+<MudContainer MaxWidth="MaxWidth.ExtraLarge" Class="mt-6">
+    @* --- COMMAND CENTER HEADER --- *@
+    <div class="d-flex align-center gap-3 mb-6">
+        <MudIcon Icon="@Icons.Material.Filled.Terminal" Color="Color.Primary" Size="Size.Large" />
+        <div>
+            <MudText Typo="Typo.h4" Class="font-weight-bold" Style="color: #0A2540;">AskEIVA Dashboard</MudText>
+            <MudText Typo="Typo.body2" Class="text-muted">Customer Service Department</MudText>
+        </div>
+    </div>
 
-X
+    @* --- LIVE VECTOR DATABASE METRICS STRIP --- *@
+    <MudGrid Class="mb-6">
+        <MudItem xs="12" sm="6" md="3">
+            <MudPaper Elevation="0" Class="pa-4 bg-white border-sm" Style="border: 1px solid #E2E8F0; border-radius: 12px;">
+                <div class="d-flex align-center justify-space-between">
+                    <MudText Typo="Typo.caption" Class="font-weight-bold text-muted">KNOWLEDGE NODES</MudText>
+                    <MudIcon Icon="@Icons.Material.Filled.AutoAwesome" Color="Color.Primary" Size="Size.Small" />
+                </div>
+                <MudText Typo="Typo.h4" Class="font-weight-bold mt-2" Style="color: #0A2540;">@_knowledgeNodeCount</MudText>
+                <MudText Typo="Typo.caption" Class="text-success mt-1 d-block">● Vectorized Ticket Chunks</MudText>
+            </MudPaper>
+        </MudItem>
+
+        <MudItem xs="12" sm="6" md="3">
+            <MudPaper Elevation="0" Class="pa-4 bg-white border-sm" Style="border: 1px solid #E2E8F0; border-radius: 12px;">
+                <div class="d-flex align-center justify-space-between">
+                    <MudText Typo="Typo.caption" Class="font-weight-bold text-muted">DOCUMENT LIBRARY</MudText>
+                    <MudIcon Icon="@Icons.Material.Filled.MenuBook" Color="Color.Info" Size="Size.Small" />
+                </div>
+                <MudText Typo="Typo.h4" Class="font-weight-bold mt-2" Style="color: #0A2540;">@_docLibraryCount</MudText>
+                <MudText Typo="Typo.caption" Class="text-muted mt-1 d-block">Unique articles processed</MudText>
+            </MudPaper>
+        </MudItem>
+
+        <MudItem xs="12" sm="6" md="3">
+            <MudPaper Elevation="0" Class="pa-4 bg-white border-sm" Style="border: 1px solid #E2E8F0; border-radius: 12px;">
+                <div class="d-flex align-center justify-space-between">
+                    <MudText Typo="Typo.caption" Class="font-weight-bold text-muted">RELEASE NOTES</MudText>
+                    <MudIcon Icon="@Icons.Material.Filled.NewReleases" Color="Color.Warning" Size="Size.Small" />
+                </div>
+                <MudText Typo="Typo.h4" Class="font-weight-bold mt-2" Style="color: #0A2540;">@_releaseNodeCount</MudText>
+                <MudText Typo="Typo.caption" Class="text-muted mt-1 d-block">Cross-version indices tracked</MudText>
+            </MudPaper>
+        </MudItem>
+
+        <MudItem xs="12" sm="6" md="3">
+            <MudPaper Elevation="0" Class="pa-4 bg-white border-sm" Style="border: 1px solid #E2E8F0; border-radius: 12px;">
+                <div class="d-flex align-center justify-space-between">
+                    <MudText Typo="Typo.caption" Class="font-weight-bold text-muted">GRAPH TRIPLETS</MudText>
+                    <MudIcon Icon="@Icons.Material.Filled.Hub" Color="Color.Secondary" Size="Size.Small" />
+                </div>
+                <MudText Typo="Typo.h4" Class="font-weight-bold mt-2" Style="color: #0A2540;">@_graphTripletsCount</MudText>
+                <MudText Typo="Typo.caption" Class="text-success mt-1 d-block">Active scenario linkages</MudText>
+            </MudPaper>
+        </MudItem>
+    </MudGrid>
+
+    @* --- WORKSPACE APPLICATION GATEWAYS --- *@
+    <MudText Typo="Typo.h6" Class="font-weight-bold mb-3" Style="color: #0A2540;">Platform Shortcuts</MudText>
+    <MudGrid Class="mb-6">
+        <MudItem xs="12" md="6" lg="3">
+            <MudPaper Elevation="1" Class="pa-5 d-flex flex-column justify-space-between bg-white hover-card" Style="border-radius: 12px; height: 200px; border-left: 4px solid #594AE2;">
+                <div>
+                    <MudText Typo="Typo.h6" Class="font-weight-bold mb-1">AskEIVA Chat</MudText>
+                    <MudText Typo="Typo.body2" Class="text-muted">Interactive context-aware assistant for support engineers troubleshooting marine operations.</MudText>
+                </div>
+                <MudButton Variant="Variant.Text" Color="Color.Primary" EndIcon="@Icons.Material.Filled.ArrowForward" OnClick="@(() => Navigation.NavigateTo("/chat"))" Class="align-self-start pa-0 mt-2">Launch Chat</MudButton>
+            </MudPaper>
+        </MudItem>
+
+        <MudItem xs="12" md="6" lg="3">
+            <MudPaper Elevation="1" Class="pa-5 d-flex flex-column justify-space-between bg-white hover-card" Style="border-radius: 12px; height: 200px; border-left: 4px solid #FF4081;">
+                <div>
+                    <MudText Typo="Typo.h6" Class="font-weight-bold mb-1">GraphRAG Explorer</MudText>
+                    <MudText Typo="Typo.body2" Class="text-muted">Relational context chains and predicate maps linked via semantic entities.</MudText>
+                </div>
+                <MudButton Variant="Variant.Text" Color="Color.Secondary" EndIcon="@Icons.Material.Filled.ArrowForward" OnClick="@(() => Navigation.NavigateTo("/graphrag"))" Class="align-self-start pa-0 mt-2">Explore Graph</MudButton>
+            </MudPaper>
+        </MudItem>
+
+        <MudItem xs="12" md="6" lg="3">
+            <MudPaper Elevation="1" Class="pa-5 d-flex flex-column justify-space-between bg-white hover-card" Style="border-radius: 12px; height: 200px; border-left: 4px solid #00C853;">
+                <div>
+                    <MudText Typo="Typo.h6" Class="font-weight-bold mb-1">RLHF Training Site</MudText>
+                    <MudText Typo="Typo.body2" Class="text-muted">Reinforcement Learning from Human Feedback for future training - Review, swipe, and vote on model proposed fixes.</MudText>
+                </div>
+                <MudButton Variant="Variant.Text" Color="Color.Success" EndIcon="@Icons.Material.Filled.ArrowForward" OnClick="@(() => Navigation.NavigateTo("/evaluationdashboard"))" Class="align-self-start pa-0 mt-2">Open Training Site</MudButton>
+            </MudPaper>
+        </MudItem>
+
+        <MudItem xs="12" md="6" lg="3">
+            <MudPaper Elevation="1" Class="pa-5 d-flex flex-column justify-space-between bg-white hover-card" Style="border-radius: 12px; height: 200px; border-left: 4px solid #FFB300;">
+                <div>
+                    <MudText Typo="Typo.h6" Class="font-weight-bold mb-1">Configuration Portal</MudText>
+                    <MudText Typo="Typo.body2" Class="text-muted">Manage system variables, fine-tuning path segmentations, and conversation logs.</MudText>
+                </div>
+                <MudButton Variant="Variant.Text" Color="Color.Warning" EndIcon="@Icons.Material.Filled.ArrowForward" OnClick="@(() => Navigation.NavigateTo("/configurationportal"))" Class="align-self-start pa-0 mt-2">Manage System</MudButton>
+            </MudPaper>
+        </MudItem>
+    </MudGrid>
+
+    @* --- CORE INFRASTRUCTURE STATUS REGISTRY --- *@
+    <MudPaper Elevation="0" Class="pa-4 bg-white border-sm" Style="border: 1px solid #E2E8F0; border-radius: 12px;">
+        <div class="d-flex align-center justify-space-between flex-wrap gap-4">
+            <div class="d-flex align-center gap-2">
+                <div class="status-pulse-green"></div>
+                <MudText Typo="Typo.body2" Class="font-weight-bold" Style="color: #475569;">Connection State</MudText>
+            </div>
+            <div class="d-flex align-center gap-6 flex-wrap">
+                <MudText Typo="Typo.caption" Class="d-flex align-center gap-1"><MudIcon Icon="@Icons.Material.Filled.Cloud" Size="Size.Small" Color="Color.Success" /> Weaviate Cluster: <b>Connected</b></MudText>
+                <MudText Typo="Typo.caption" Class="d-flex align-center gap-1"><MudIcon Icon="@Icons.Material.Filled.Settings" Size="Size.Small" Color="Color.Success" /> Mistral LLM Service: <b>Online</b></MudText>
+                <MudText Typo="Typo.caption" Class="d-flex align-center gap-1"><MudIcon Icon="@Icons.Material.Filled.Storage" Size="Size.Small" Color="Color.Success" /> RLHF Dataset Engine: <b>Active</b></MudText>
+            </div>
+        </div>
+    </MudPaper>
+</MudContainer>
+
+<style>
+    .border-sm {
+        border: 1px solid #E2E8F0;
+    }
+    .hover-card {
+        border: 1px solid #E2E8F0;
+        transition: transform 0.2s ease, box-shadow 0.2s ease;
+    }
+    .hover-card:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 10px 20px rgba(0,0,0,0.05) !important;
+    }
+    .status-pulse-green {
+        width: 10px;
+        height: 10px;
+        background-color: #00C853;
+        border-radius: 50%;
+        box-shadow: 0 0 0 0 rgba(0, 200, 83, 0.7);
+        animation: pulse-green 2s infinite;
+    }
+    @@keyframes pulse-green {
+        0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(0, 200, 83, 0.7); }
+        70% { transform: scale(1); box-shadow: 0 0 0 6px rgba(0, 200, 83, 0); }
+        100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(0, 200, 83, 0); }
+    }
+</style>
+
+@code {
+    private int _knowledgeNodeCount = 0;
+    private int _docLibraryCount = 0;
+    private int _releaseNodeCount = 0;
+    private int _graphTripletsCount = 0;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            // 💡 DYNAMIC LOADING: Reuses your generic count repository methods to pull fresh database sizes
+            _knowledgeNodeCount = await KnowledgeRepo.GetTotalClassCountAsync("KnowledgeNode");
+            _docLibraryCount = await KnowledgeRepo.GetDistinctSourceCountAsync("DocumentLibrary", "document_id");
+            _releaseNodeCount = await KnowledgeRepo.GetTotalClassCountAsync("SoftwareReleaseNode");
+            
+            // Estimates a quick counter baseline for graph connections
+            var graphMesh = await KnowledgeRepo.SearchGraphTriplesAsync("", limit: 100);
+            _graphTripletsCount = graphMesh?.Count() ?? 0;
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[Home Dashboard Aggregation Error]: {ex.Message}");
+        }
+    }
+}
