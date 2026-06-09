@@ -8,6 +8,7 @@
 @using AskEiva.Application.Telemetry.Queries
 @using AskEiva.Application.ReleaseNotes.Commands
 @using AskEiva.Application.Tickets.Commands
+@using AskEiva.Application.Documentation.Commands
 @using AskEiva.Domain.Services;
 @using AskEiva.Application.Graphs.Commands;
 @inject IMediator Mediator
@@ -20,7 +21,6 @@
 
 <MudContainer MaxWidth="MaxWidth.ExtraLarge" Class="mt-6">
     
-    <!-- HEADER BAR WITH EIVA BRANDING VIBE -->
     <div class="d-flex align-center justify-space-between mb-6 pa-2">
         <div>
             <MudText Typo="Typo.h4" Class="font-weight-bold" Style="color: #0A2540; font-family: 'Segoe UI', sans-serif;">Configuration Portal</MudText>
@@ -38,9 +38,6 @@
         </div>
     </div>
 
-    <!-- =================================================================================== -->
-    <!-- LAYER 1: KPI OVERVIEW ROW -->
-    <!-- =================================================================================== -->
     <MudGrid>
         <MudItem xs="12" sm="6" md="3">
             <MudPaper Elevation="0" Class="pa-4 d-flex align-center justify-space-between" Style="border: 1px solid #E2E8F0; border-radius: 8px; background-color: #FFFFFF;">
@@ -89,9 +86,6 @@
 
     <br /><br />
 
-    <!-- =================================================================================== -->
-    <!-- LAYER 2: DEDICATED SECTION WITH ONLY CHAT DIALOGUE TABLE -->
-    <!-- =================================================================================== -->
     <MudGrid>
         <MudItem xs="12">
             <MudPaper Elevation="0" Class="pa-5" Style="border: 1px solid #E2E8F0; border-radius: 8px; background: #FFFFFF;">
@@ -124,34 +118,11 @@
                              FilterMode="DataGridFilterMode.ColumnFilterMenu">
                     <Columns>
                         <HierarchyColumn T="InteractionLogItemDto" />
-                        
-                        <PropertyColumn Property="x => x.Timestamp" 
-                                        Title="Timestamp" 
-                                        Format="yyyy-MM-dd HH:mm:ss" 
-                                        Sortable="true" 
-                                        HeaderStyle="color: #0A2540; font-weight: bold; width: 180px;" />
-                        
-                        <PropertyColumn Property="x => x.UserPrompt" 
-                                        Title="User Question" 
-                                        Sortable="true" 
-                                        HeaderStyle="color: #0A2540; font-weight: bold;" />
-                        
-                        <PropertyColumn Property="x => x.CopilotResponse" 
-                                        Title="Response Snippet" 
-                                        Sortable="false" 
-                                        Filterable="false"
-                                        HeaderStyle="color: #0A2540; font-weight: bold;" 
-                                        CellStyle="text-overflow: ellipsis; max-width: 350px; white-space: nowrap; overflow: hidden; color: #64748B;" />
-                        
-                        <PropertyColumn Property="x => x.FeedbackState" 
-                                        Title="Feedback" 
-                                        Sortable="true" 
-                                        HeaderStyle="color: #0A2540; font-weight: bold; width: 140px;" />
-                        
-                        <PropertyColumn Property="x => x.ModelUsed" 
-                                        Title="Model" 
-                                        Sortable="true" 
-                                        HeaderStyle="color: #0A2540; font-weight: bold; width: 180px; font-family: monospace;" />
+                        <PropertyColumn Property="x => x.Timestamp" Title="Timestamp" Format="yyyy-MM-dd HH:mm:ss" Sortable="true" HeaderStyle="color: #0A2540; font-weight: bold; width: 180px;" />
+                        <PropertyColumn Property="x => x.UserPrompt" Title="User Question" Sortable="true" HeaderStyle="color: #0A2540; font-weight: bold;" />
+                        <PropertyColumn Property="x => x.CopilotResponse" Title="Response Snippet" Sortable="false" Filterable="false" HeaderStyle="color: #0A2540; font-weight: bold;" CellStyle="text-overflow: ellipsis; max-width: 350px; white-space: nowrap; overflow: hidden; color: #64748B;" />
+                        <PropertyColumn Property="x => x.FeedbackState" Title="Feedback" Sortable="true" HeaderStyle="color: #0A2540; font-weight: bold; width: 140px;" />
+                        <PropertyColumn Property="x => x.ModelUsed" Title="Model" Sortable="true" HeaderStyle="color: #0A2540; font-weight: bold; width: 180px; font-family: monospace;" />
                     </Columns>
                     <ChildRowContent>
                         <MudCard Style="background: #F8FAFC; border-radius: 0; box-shadow: none; border-top: 1px solid #E2E8F0;" Class="pa-4">
@@ -161,7 +132,6 @@
                                     <div class="pa-3 mb-3 bg-white border rounded" style="color: #334155; font-size: 0.9rem; line-height: 1.5; border-color: #E2E8F0;">
                                         @context.Item.UserPrompt
                                     </div>
-                                    
                                     <MudText Typo="Typo.subtitle2" Class="font-weight-bold mb-1" Style="color: #0A2540;">🤖 AskEIVA System Response:</MudText>
                                     <div class="pa-3 bg-white border rounded" style="color: #334155; font-size: 0.9rem; line-height: 1.5; white-space: pre-wrap; border-color: #E2E8F0;">
                                         @context.Item.CopilotResponse
@@ -180,9 +150,6 @@
 
     <br /><br />
 
-    <!-- =================================================================================== -->
-    <!-- LAYER 3: DEDICATED SECTION FOR DOCUMENTATION RELATED FUNCTIONS -->
-    <!-- =================================================================================== -->
     <MudGrid>
         <MudItem xs="12">
             <MudPaper Elevation="0" Class="pa-5" Style="border: 1px solid #E2E8F0; border-radius: 8px; background: #FFFFFF;">
@@ -191,6 +158,27 @@
                         <MudIcon Icon="@Icons.Material.Filled.LibraryBooks" Style="color: #0A2540;" />
                         <MudText Typo="Typo.h6" Style="color: #0A2540; font-weight: 600;">Documentation Library</MudText>
                     </div>
+                    
+                    @* 💡 STATE-AWARE CONTROLLER: Disables dynamically if Weaviate already contains documents *@
+                    <MudButton Variant="Variant.Filled"
+                               Size="Size.Small"
+                               StartIcon="@(_documentCount > 0 ? Icons.Material.Filled.CloudDone : Icons.Material.Filled.CloudDownload)"
+                               Style="@(_documentCount > 0 ? "background-color: #E2E8F0; color: #64748B; font-weight: bold; box-shadow: none;" : "background-color: #C5DC22; color: #0A2540; font-weight: bold; box-shadow: none;")"
+                               OnClick="TriggerDocumentationIngestionPipeline"
+                               Disabled="@(_isCrawlingDocs || _documentCount > 0)">
+                        @if (_isCrawlingDocs)
+                        {
+                            <span>Crawling Solutions...</span>
+                        }
+                        else if (_documentCount > 0)
+                        {
+                            <span>Collection Populated</span>
+                        }
+                        else
+                        {
+                            <span>Index Documentation Assets</span>
+                        }
+                    </MudButton>
                 </div>
                 <MudText Typo="Typo.body2" Class="mb-4 mt-1">
                     <span style="color: #64748B;">Manages the vectorization state of core EIVA manual assets, user manuals, and articles stored within the database. Access the raw records directly on the </span>
@@ -207,17 +195,10 @@
                 <div class="d-flex align-center gap-4">
                     <MudPaper Class="pa-3 px-6 d-flex align-center gap-3" Elevation="0" Style="background-color: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 6px;">
                         <MudText Typo="Typo.body2" Style="color: #0A2540; font-weight: bold;">Active Knowledge Base Docs:</MudText>
-                        <MudChip T="string" Size="Size.Small" Color="Color.Success" Style="font-weight: bold;">@_documentCount Verified</MudChip>
+                        <MudChip T="string" Size="Size.Small" Color="@(_documentCount > 0 ? Color.Success : Color.Warning)" Style="font-weight: bold;">
+                            @_documentCount Verified
+                        </MudChip>
                     </MudPaper>
-                    
-                    <!-- Placeholder button for future documentation utilities (e.g., reindexing files) -->
-                    <MudButton Variant="Variant.Outlined" 
-                               Size="Size.Small" 
-                               StartIcon="@Icons.Material.Filled.FolderZip"
-                               Style="border: 1px solid #E2E8F0; color: #64748B;"
-                               Disabled="true">
-                        Re-Index Doc Assets (Regulated)
-                    </MudButton>
                 </div>
             </MudPaper>
         </MudItem>
@@ -225,9 +206,6 @@
 
     <br /><br />
 
-    <!-- =================================================================================== -->
-    <!-- LAYER 4: DEDICATED SECTION FOR RELEASE NOTES SCRAPER & MANIFESTS -->
-    <!-- =================================================================================== -->
     <MudGrid>
         <MudItem xs="12">
             <MudPaper Elevation="0" Class="pa-5" Style="border: 1px solid #E2E8F0; border-radius: 8px; background: #FFFFFF;">
@@ -237,7 +215,6 @@
                         <MudText Typo="Typo.h6" Style="color: #0A2540; font-weight: 600;">Release Notes</MudText>
                     </div>
                     
-                    <!-- Matches EIVA Download Site button style using their theme logic -->
                     <MudButton Variant="Variant.Filled" 
                                Style="background-color: #C5DC22; color: #0A2540; font-weight: bold; box-shadow: none;" 
                                Size="Size.Small" 
@@ -247,7 +224,7 @@
                         @(_isScraping ? "Parsing Manifest PDF..." : "Sync Latest Release Notes")
                     </MudButton>
                 </div>
-            <MudText Typo="Typo.body2" Class="mb-4">
+                <MudText Typo="Typo.body2" Class="mb-4">
                     <span style="color: #64748B;">Scrapes and segments release updates (e.g., NaviPac, NaviScan, NaviEdit manifests) straight into embedded semantic structures. Track live builds directly on the </span>
                     <a href="https://download.eiva.com" 
                        target="_blank" 
@@ -257,7 +234,7 @@
                     </a>
                 </MudText>
 
-<MudAlert Severity="Severity.Normal" NoIcon="true" Dense="true" Class="mt-2" Style="background-color: #F8FAFC; border: 1px solid #E2E8F0; color: #334155;">
+                <MudAlert Severity="Severity.Normal" NoIcon="true" Dense="true" Class="mt-2" Style="background-color: #F8FAFC; border: 1px solid #E2E8F0; color: #334155;">
                     <div class="d-flex align-center gap-2 font-small" style="font-size: 0.85rem;">
                         <MudIcon Icon="@Icons.Material.Filled.Info" Size="Size.Small" Style="color: #EA580C;" />
                         <span>System tracking matches historical data points across <strong>@_releaseCount</strong> localized package nodes.</span>
@@ -269,9 +246,6 @@
 
     <br /><br />
 
-    <!-- =================================================================================== -->
-    <!-- LAYER 5: DEDICATED SECTION FOR FRESHDESK TICKETS SYNC/CHUNKING -->
-    <!-- =================================================================================== -->
     <MudGrid>
         <MudItem xs="12">
             <MudPaper Elevation="0" Class="pa-5" Style="border: 1px solid #E2E8F0; border-radius: 8px; background: #FFFFFF;">
@@ -355,204 +329,82 @@
             </MudPaper>
         </MudItem>
     </MudGrid>
-    <br /><br />
 
-    <!-- =================================================================================== -->
-    <!-- LAYER 6: DEDICATED SECTION FOR JIRA SYNC/CHUNKING -->
-    <!-- =================================================================================== -->
+    <br /><br />
 
     <MudGrid>
         <MudItem xs="12">
-            <MudPaper Elevation="0" Class="pa-5" Style="border: 1px solid #E2E8F0; border-radius: 8px; background: #FFFFFF;">
+            @* 💡 DEPRECATION STYLING: Dimmed opacity visibly isolates deactivated tenant layouts *@
+            <MudPaper Elevation="0" Class="pa-5" Style="border: 1px solid #E2E8F0; border-radius: 8px; background: #FFFFFF; opacity: 0.65;">
                 <div class="d-flex align-center justify-space-between mb-3">
                     <div class="d-flex align-center gap-3">
-                        <MudIcon Icon="@Icons.Material.Filled.Troubleshoot" Style="color: #0A2540;" />
-                        <MudText Typo="Typo.h6" Style="color: #0A2540; font-weight: 600;">Jira</MudText>
+                        <MudIcon Icon="@Icons.Material.Filled.Troubleshoot" Style="color: #64748B;" />
+                        <MudText Typo="Typo.h6" Style="color: #64748B; font-weight: 600;">Jira Integration (Deactivated)</MudText>
                     </div>
                     
-            <MudButton Variant="Variant.Filled" 
-                    Style="background-color: #C5DC22; color: #0A2540; font-weight: bold; box-shadow: none;" 
-                    Size="Size.Small" 
-                    StartIcon="@Icons.Material.Filled.CastConnected" 
-                    OnClick="RunJiraLiveDiagnosticTest"
-                    Disabled="_isTestingJira">
-                @(_isTestingJira ? "Analyzing Tenant..." : "Run Connection Test")
-            </MudButton>
+                    @* 💡 PERMANENT LOCK: Button disabled via layout properties *@
+                    <MudButton Variant="Variant.Filled" 
+                               Style="background-color: #E2E8F0; color: #94A3B8; font-weight: bold; box-shadow: none;" 
+                               Size="Size.Small" 
+                               StartIcon="@Icons.Material.Filled.Block" 
+                               Disabled="true">
+                        Connection Blocked
+                    </MudButton>
                 </div>
                 
-                <MudText Typo="Typo.body2" Class="mb-4">
-                    <span style="color: #64748B;">Queries live tracking tickets directly via the cloud tenant proxy layout. Access raw ticket tasks inside the external workspace </span>
-                    <a href="https://eivasw.atlassian.net/" target="_blank" style="color: #0284C7; font-weight: bold; text-decoration: none; border-bottom: 1px dashed #0284C7;">Atlassian Workcenter <MudIcon Icon="@Icons.Material.Filled.OpenInNew" Size="Size.Small" Style="font-size: 0.9rem; vertical-align: text-bottom;" /></a>
+                <MudText Typo="Typo.body2" Class="mb-4" Style="color: #94A3B8;">
+                    Queries live tracking tickets directly via the cloud tenant proxy layout. Access to external Atlassian Workcenter environments has been administration-restricted.
                 </MudText>
-
-@if (_discoveredJiraIssues != null && _discoveredJiraIssues.Any())
-{
-    <div class="mt-4 border rounded pa-2 bg-white">
-        <MudText Typo="Typo.subtitle2" Class="mb-2 font-weight-bold" Style="color: #0A2540;">
-            🛰️ Live Project Discovery Sample Pool (Showing @_discoveredJiraIssues.Count unique records across tenant boundaries)
-        </MudText>
-        
-        <MudTable Items="@_discoveredJiraIssues" 
-          Dense="true" 
-          Hover="true" 
-          Bordered="false" 
-          Striped="true" 
-          Elevation="0" 
-          Height="550px" 
-          FixedHeader="true"
-          RowsPerPage="25">
-            <HeaderContent>
-                <MudTh /> <MudTh Style="color: #0A2540; font-weight: bold;">Key</MudTh>
-                <MudTh Style="color: #0A2540; font-weight: bold;">Internal ID</MudTh>
-                <MudTh Style="color: #0A2540; font-weight: bold;">Project</MudTh>
-                <MudTh Style="color: #0A2540; font-weight: bold;">Type</MudTh>
-                <MudTh Style="color: #0A2540; font-weight: bold;">Status</MudTh>
-                <MudTh Style="color: #0A2540; font-weight: bold;">Summary Headline</MudTh>
-                <MudTh Style="color: #0A2540; font-weight: bold;">Discussions</MudTh>
-            </HeaderContent>
-            <RowTemplate>
-                <MudTd>
-                    <MudIconButton Icon="@(context.Fields.Description != null || (context.Fields.CommentCollection?.Comments?.Any() ?? false) ? Icons.Material.Filled.ExpandMore : Icons.Material.Filled.Remove)" 
-                                   Size="Size.Small" 
-                                   OnClick="@(() => OnRowExpandToggled(context))" />
-                </MudTd>
-                <MudTd><MudChip T="string" Size="Size.Small" Variant="Variant.Text" Style="font-weight: bold; font-family: monospace; color: #0284C7;">@context.Key</MudChip></MudTd>
-                <MudTd Style="font-family: monospace; font-size: 0.85rem; color: #64748B;">@context.Id</MudTd>
-                <MudTd>@context.Fields.Project?.Name <span style="color: #64748B; font-size: 0.8rem;">[@context.Fields.Project?.Key]</span></MudTd>
-                <MudTd><span style="font-size: 0.85rem;">@context.Fields.IssueType?.Name</span></MudTd>
-                <MudTd>
-                    <span class="status-badge @(context.Fields.Status?.Name?.ToLower() == "done" || context.Fields.Status?.Name?.ToLower() == "closed" ? "success" : "processing")">
-                        @context.Fields.Status?.Name
-                    </span>
-                </MudTd>
-                <MudTd Style="font-weight: 500; color: #1E293B;">@context.Fields.Summary</MudTd>
-                <MudTd>
-                    @if (context.Fields.CommentCollection?.Comments != null && context.Fields.CommentCollection.Comments.Any())
-                    {
-                        <MudChip T="string" Size="Size.Small" Color="Color.Info" Variant="Variant.Filled" Style="font-size: 0.75rem; font-weight: bold;">
-                            @(context.Fields.CommentCollection.Comments.Count) threads
-                        </MudChip>
-                    }
-                    else
-                    {
-                        <span style="color: #94A3B8; font-size: 0.85rem;">0 notes</span>
-                    }
-                </MudTd>
-            </RowTemplate>
-            
-            <ChildRowContent>
-                @if (_expandedRows.Contains(context.Key))
-                {
-                    <MudTr>
-                        <MudTd colspan="8" Style="background-color: #F8FAFC; padding: 16px; border-top: 1px solid #E2E8F0; border-bottom: 1px solid #E2E8F0;">
-                            <MudGrid>
-                                <MudItem xs="12" md="6">
-                                    <MudText Typo="Typo.subtitle2" Class="font-weight-bold mb-1" Style="color: #0A2540;">Parsed Description</MudText>
-                                    <div class="pa-3 bg-white border rounded text-secondary" style="white-space: pre-wrap; font-size: 0.9rem; max-height: 250px; overflow-y: auto;">
-                                        @if (context.Fields.Description != null && !string.IsNullOrWhiteSpace(AskEiva.Application.Jira.Utils.AtlassianDocumentParser.ToPlainText(context.Fields.Description)))
-                                        {
-                                            @AskEiva.Application.Jira.Utils.AtlassianDocumentParser.ToPlainText(context.Fields.Description)
-                                        }
-                                        else
-                                        {
-                                            <span style="color: #94A3B8; font-style: italic;">[No description text supplied on this Jira card]</span>
-                                        }
-                                    </div>
-                                </MudItem>
-                                
-                                <MudItem xs="12" md="6">
-                                    <MudText Typo="Typo.subtitle2" Class="font-weight-bold mb-1" Style="color: #0A2540;">Discussion Tree Logs</MudText>
-                                    <div class="pa-3 bg-white border rounded" style="max-height: 250px; overflow-y: auto;">
-                                        @if (context.Fields.CommentCollection?.Comments != null && context.Fields.CommentCollection.Comments.Any())
-                                        {
-                                            @foreach (var comment in context.Fields.CommentCollection.Comments)
-                                            {
-                                                <div class="mb-2 pb-2" style="border-bottom: 1px dashed #E2E8F0; font-size: 0.85rem;">
-                                                    <div class="d-flex align-center justify-space-between text-muted mb-1" style="font-size: 0.75rem; font-weight: bold; color: #64748B;">
-                                                        <span>ID: #@comment.Id</span>
-                                                        <span>@comment.Created</span>
-                                                    </div>
-                                                    <p class="ma-0 style-text text-dark" style="white-space: pre-wrap;">
-                                                        @AskEiva.Application.Jira.Utils.AtlassianDocumentParser.ToPlainText(comment.Body)
-                                                    </p>
-                                                </div>
-                                            }
-                                        }
-                                        else
-                                        {
-                                            <span style="color: #94A3B8; font-style: italic; font-size: 0.9rem;">No chronological developer notes present.</span>
-                                        }
-                                    </div>
-                                </MudItem>
-                            </MudGrid>
-                        </MudTd>
-                    </MudTr>
-                }
-            </ChildRowContent>
-        </MudTable>
-    </div>
-
-}
-else if (!string.IsNullOrWhiteSpace(_jiraDiagnosticStatus))
-{
-    <div class="pa-3 border rounded font-monospace mt-4" style="background-color: #F8FAFC; color: #475569; font-size: 0.85rem;">
-        @_jiraDiagnosticStatus
-    </div>
-}
             </MudPaper>
         </MudItem>
     </MudGrid>
 
-<MudCard Elevation="0" Style="border: 1px solid #E2E8F0; border-radius: 4px;" Class="pa-6 mt-4">
-    <MudText Typo="Typo.h6" Class="font-weight-bold mb-2" Style="color: #0A2540;">
-        Intelligent Context Mesh Builder
-    </MudText>
-    <MudText Typo="Typo.body2" Class="mb-4" Style="color: #5B7083;">
-        Processes un-distilled Freshdesk ticket nodes, runs multi-collection vector lookaheads, and establishes strongly-typed cross-reference graph edges.
-    </MudText>
+    <MudCard Elevation="0" Style="border: 1px solid #E2E8F0; border-radius: 4px;" Class="pa-6 mt-4">
+        <MudText Typo="Typo.h6" Class="font-weight-bold mb-2" Style="color: #0A2540;">Intelligent Context Mesh Builder</MudText>
+        <MudText Typo="Typo.body2" Class="mb-4" Style="color: #5B7083;">Processes un-distilled Freshdesk ticket nodes, runs multi-collection vector lookaheads, and establishes strongly-typed cross-reference graph edges.</MudText>
 
-<div class="d-flex flex-column gap-3">
-        <div class="d-flex align-center gap-4">
-            <MudButton Variant="Variant.Filled"  
-                       Disabled="@StateStore.IsProcessing"
-                       OnClick="TriggerGlobalContextMeshGeneration"
-                       StartIcon="@Icons.Material.Filled.Hub"
-                       Style="background-color: #C5DC22; font-weight: bold;">
-                @(StateStore.IsProcessing ? "DISTILLING MESH..." : "BUILD DYNAMIC GRAPH")
-            </MudButton>
+        <div class="d-flex flex-column gap-3">
+            <div class="d-flex align-center gap-4">
+                <MudButton Variant="Variant.Filled"  
+                           Disabled="@StateStore.IsProcessing"
+                           OnClick="TriggerGlobalContextMeshGeneration"
+                           StartIcon="@Icons.Material.Filled.Hub"
+                           Style="background-color: #C5DC22; font-weight: bold;">
+                    @(StateStore.IsProcessing ? "DISTILLING MESH..." : "BUILD DYNAMIC GRAPH")
+                </MudButton>
 
-            @if (StateStore.IsProcessing)
+                @if (StateStore.IsProcessing)
+                {
+                    <MudProgressCircular Color="Color.Secondary" Size="Size.Small" Indeterminate="true" />
+                }
+            </div>
+
+            @if (StateStore.IsProcessing && StateStore.TotalCount > 0)
             {
-                <MudProgressCircular Color="Color.Secondary" Size="Size.Small" Indeterminate="true" />
+                <div class="mt-2">
+                    <div class="d-flex justify-space-between mb-1">
+                        <MudText Typo="Typo.caption" Style="color: #64748B;">Processing: @StateStore.CurrentCount / @StateStore.TotalCount</MudText>
+                        <MudText Typo="Typo.caption" Class="font-weight-bold" Style="color: #0A2540;">@StateStore.Percentage%</MudText>
+                    </div>
+                    <MudProgressLinear Color="Color.Secondary" Value="@StateStore.Percentage" Class="my-1" Size="Size.Medium" Striped="true" />
+                </div>
             }
         </div>
 
-        @if (StateStore.IsProcessing && StateStore.TotalCount > 0)
+        @if (StateStore.StatusMessage != "Idle")
         {
-            <div class="mt-2">
-                <div class="d-flex justify-space-between mb-1">
-                    <MudText Typo="Typo.caption" Style="color: #64748B;">Processing: @StateStore.CurrentCount / @StateStore.TotalCount</MudText>
-                    <MudText Typo="Typo.caption" Class="font-weight-bold" Style="color: #0A2540;">@StateStore.Percentage%</MudText>
-                </div>
-                <MudProgressLinear Color="Color.Secondary" Value="@StateStore.Percentage" Class="my-1" Size="Size.Medium" Striped="true" />
-            </div>
+            <MudText Typo="Typo.body2" Class="mt-3 font-mono" Style="color: #0A2540; background-color: #F8FAFC; padding: 8px; border-radius: 4px;">
+                @StateStore.StatusMessage
+            </MudText>
         }
-    </div>
 
-    @if (StateStore.StatusMessage != "Idle")
-    {
-        <MudText Typo="Typo.body2" Class="mt-3 font-mono" Style="color: #0A2540; background-color: #F8FAFC; padding: 8px; border-radius: 4px;">
-            @StateStore.StatusMessage
-        </MudText>
-    }
-
-    @if (!string.IsNullOrEmpty(_graphMeshStatusMessage))
-    {
-        <MudText Typo="Typo.body2" Class="mt-3 font-mono" Style="color: #0A2540; background-color: #F8FAFC; padding: 8px; border-radius: 4px;">
-            @_graphMeshStatusMessage
-        </MudText>
-    }
-</MudCard>
+        @if (!string.IsNullOrEmpty(_graphMeshStatusMessage))
+        {
+            <MudText Typo="Typo.body2" Class="mt-3 font-mono" Style="color: #0A2540; background-color: #F8FAFC; padding: 8px; border-radius: 4px;">
+                @_graphMeshStatusMessage
+            </MudText>
+        }
+    </MudCard>
 
 </MudContainer>
 
@@ -567,8 +419,7 @@ else if (!string.IsNullOrWhiteSpace(_jiraDiagnosticStatus))
 @code {
     private bool _isLoading = false;
     private bool _isScraping = false;
-    private bool _isTestingJira = false; 
-    private string _jiraDiagnosticStatus = ""; 
+    private bool _isCrawlingDocs = false;
     private int _documentCount = 0;
     private int _ticketCount = 0;
     private int _releaseCount = 0;
@@ -581,6 +432,8 @@ else if (!string.IsNullOrWhiteSpace(_jiraDiagnosticStatus))
     private int _totalChunksCommitted = 0;
     private List<string> _liveLogStream = new();
     private List<SyncProgressUpdate> _processedTicketsHistory = new();
+    private string _graphMeshStatusMessage = string.Empty;
+    private HashSet<string> _expandedRows = new();
 
     protected override async Task OnInitializedAsync()
     {
@@ -588,17 +441,48 @@ else if (!string.IsNullOrWhiteSpace(_jiraDiagnosticStatus))
         await FetchDashboardTelemetryAsync();
         StateStore.OnStateChanged += ProgressStateStoreChanged;
     }
-    private string _graphMeshStatusMessage = string.Empty;
-    
-    // 💡 Track bar telemetry metrics indexes
-    private int _currentTicketIndex = 0;
-    private int _totalTicketsToProcess = 0;
-    private int _calculatedPercentage => _totalTicketsToProcess > 0 ? (int)((double)_currentTicketIndex / _totalTicketsToProcess * 100) : 0;
 
-private void ProgressStateStoreChanged()
+    private void ProgressStateStoreChanged()
     {
-        // Safely push state changes across Blazor threads to avoid cross-thread UI crashes
         InvokeAsync(StateHasChanged);
+    }
+
+    @* 💡 CORE CRAWLER METHOD: Triggers MediatR pipeline configuration sweep *@
+    private async Task TriggerDocumentationIngestionPipeline()
+    {
+        if (_documentCount > 0 || _isCrawlingDocs) return;
+
+        _isCrawlingDocs = true;
+        StateHasChanged();
+
+        try
+        {
+            // Array of specific targeted category strings extracted from public solution endpoints
+            var categoryPoolIds = new List<string> { "4300055112", "4300062115" }; 
+            
+            var command = new IngestDocumentationCommand(categoryPoolIds);
+            var result = await Mediator.Send(command);
+
+            if (result.Success)
+            {
+                Snackbar?.Add($"Success! Synchronized {result.ArticlesProcessed} manuals.", Severity.Success);
+            }
+            else
+            {
+                Snackbar?.Add($"Crawl completed with notes: {result.Message}", Severity.Warning);
+            }
+
+            await FetchDashboardTelemetryAsync();
+        }
+        catch (Exception ex)
+        {
+            Snackbar?.Add($"Documentation Channel broken: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _isCrawlingDocs = false;
+            StateHasChanged();
+        }
     }
 
     private async Task TriggerGlobalContextMeshGeneration()
@@ -609,155 +493,50 @@ private void ProgressStateStoreChanged()
         StateStore.UpdateProgress(0, 0, "Initialization", "Spawning background context mesh processing core...");
         StateHasChanged();
 
-    _ = Task.Run(async () =>
-{
-    try
-    {
-        var progressReporter = new Progress<AskEiva.Application.Graphs.Commands.GraphProgressReport>(report =>
+        _ = Task.Run(async () =>
         {
-            StateStore.UpdateProgress(report.CurrentCount, report.TotalCount, report.CurrentTicketId, report.Message);
+            try
+            {
+                var progressReporter = new Progress<AskEiva.Application.Graphs.Commands.GraphProgressReport>(report =>
+                {
+                    StateStore.UpdateProgress(report.CurrentCount, report.TotalCount, report.CurrentTicketId, report.Message);
+                });
+
+                var command = new AskEiva.Application.Graphs.Commands.BuildGlobalContextGraphCommand(
+                    BatchSize: 8920, 
+                    ProgressTracker: progressReporter
+                );
+                
+                var result = await Mediator.Send(command);
+
+                StateStore.UpdateProgress(
+                    StateStore.TotalCount, 
+                    StateStore.TotalCount, 
+                    "Complete", 
+                    $"🎉 Processed batch successfully! Added +{result.EdgesCreated} multi-hop context graph paths inside Weaviate."
+                );
+            }
+            catch (Exception ex)
+            {
+                StateStore.UpdateProgress(StateStore.CurrentCount, StateStore.TotalCount, "Error", $"[Pipeline Faulted]: {ex.Message}");
+            }
+            finally
+            {
+                StateStore.IsProcessing = false;
+                await InvokeAsync(StateHasChanged);
+            }
         });
 
-        var command = new AskEiva.Application.Graphs.Commands.BuildGlobalContextGraphCommand(
-            BatchSize: 8920, 
-            ProgressTracker: progressReporter
-        );
-        
-        var result = await Mediator.Send(command);
-
-        StateStore.UpdateProgress(
-            StateStore.TotalCount, 
-            StateStore.TotalCount, 
-            "Complete", 
-            $"🎉 Processed batch successfully! Added +{result.EdgesCreated} multi-hop context graph paths inside Weaviate."
-        );
-    }
-    catch (Exception ex)
-    {
-        StateStore.UpdateProgress(StateStore.CurrentCount, StateStore.TotalCount, "Error", $"[Pipeline Faulted]: {ex.Message}");
-    }
-    finally
-    {
-        StateStore.IsProcessing = false;
-        await InvokeAsync(StateHasChanged);
-    }
-});
-
         await Task.CompletedTask;
-    }
-    private HashSet<string> _expandedRows = new();
-
-    private void OnRowExpandToggled(AskEiva.Domain.Services.JiraIssueRawDto issue)
-    {
-        if (_expandedRows.Contains(issue.Key))
-        {
-            _expandedRows.Remove(issue.Key);
-        }
-        else
-        {
-            _expandedRows.Add(issue.Key);
-        }
-    }
-
-private List<AskEiva.Domain.Services.JiraIssueRawDto> _discoveredJiraIssues = new();
-
-private async Task RunJiraLiveDiagnosticTest()
-    {
-        _isTestingJira = true;
-        _jiraDiagnosticStatus = "Commencing sequential numerical pagination sweep...";
-        _discoveredJiraIssues.Clear(); 
-        _expandedRows.Clear();
-        StateHasChanged();
-
-        // 💡 RESTORED: Switch back to the exact JQL string that successfully pulled data earlier
-        var queryFilter = "updated >= '2000-01-01' order by key asc";
-        
-        int currentCursor = 0;
-        int pageSize = 100; 
-        bool keepReading = true;
-        int loopSafetyGate = 0;
-
-        try
-        {
-            while (keepReading)
-            {
-                loopSafetyGate++;
-                _jiraDiagnosticStatus = $"Streaming database index logs... Unrolled {_discoveredJiraIssues.Count} unique organization keys (Index: {currentCursor})...";
-                StateHasChanged();
-
-                var options = new AskEiva.Domain.Services.JiraQueryOptions
-                {
-                    Jql = queryFilter,
-                    StartAt = currentCursor,
-                    MaxResults = pageSize
-                };
-
-                var response = await JiraService.GetIssuesPageAsync(options);
-
-                if (response != null && response.Issues != null && response.Issues.Count > 0)
-                {
-                    int freshItemsAddedThisPass = 0;
-
-                    foreach (var issue in response.Issues)
-                    {
-                        if (!_discoveredJiraIssues.Any(x => x.Key == issue.Key))
-                        {
-                            _discoveredJiraIssues.Add(issue);
-                            freshItemsAddedThisPass++;
-                        }
-                    }
-
-                    // Advance the cursor offset pointer
-                    currentCursor += response.Issues.Count;
-
-                    // Exit the loop if we reach a partial page, hit the bottom, or stop finding unique keys
-                    if (response.Issues.Count < pageSize || freshItemsAddedThisPass == 0 || currentCursor >= response.Total)
-                    {
-                        keepReading = false;
-                    }
-                }
-                else
-                {
-                    keepReading = false; 
-                }
-                
-                if (loopSafetyGate > 40) 
-                {
-                    keepReading = false;
-                }
-            }
-
-            if (_discoveredJiraIssues.Any())
-            {
-                _jiraDiagnosticStatus = ""; 
-                Snackbar?.Add($"Success! Indexed loop processed {_discoveredJiraIssues.Count} records across all active workspaces!", Severity.Success);
-            }
-            else
-            {
-                _jiraDiagnosticStatus = "[200 OK] Loop executed, but database records returned empty. Ensure the date filter is valid.";
-            }
-        }
-        catch (Exception ex)
-        {
-            _jiraDiagnosticStatus = $"[System Exception Intercepted] Index loop failed: {ex.Message}";
-            Snackbar?.Add("Connection pipeline encountered an index tracking error.", Severity.Error);
-        }
-        finally
-        {
-            _isTestingJira = false;
-            StateHasChanged();
-        }
     }
 
     private bool QuickSearchFilter(InteractionLogItemDto item)
     {
         if (string.IsNullOrWhiteSpace(_searchString)) return true;
-        
         if (item.UserPrompt.Contains(_searchString, StringComparison.OrdinalIgnoreCase)) return true;
         if (item.CopilotResponse.Contains(_searchString, StringComparison.OrdinalIgnoreCase)) return true;
         if (item.ModelUsed.Contains(_searchString, StringComparison.OrdinalIgnoreCase)) return true;
         if (item.FeedbackState.Contains(_searchString, StringComparison.OrdinalIgnoreCase)) return true;
-        
         return false;
     }
 
@@ -777,7 +556,6 @@ private async Task RunJiraLiveDiagnosticTest()
             if (!string.IsNullOrEmpty(update.CurrentTicketId))
             {
                 _lastProcessedId = update.CurrentTicketId;
-                
                 var existingRow = _processedTicketsHistory.FirstOrDefault(t => t.CurrentTicketId == update.CurrentTicketId);
                 if (existingRow != null)
                 {
@@ -791,7 +569,6 @@ private async Task RunJiraLiveDiagnosticTest()
             }
 
             if (update.Status == "Complete") _isSyncing = false;
-
             StateHasChanged();
         });
     }
@@ -852,7 +629,6 @@ private async Task RunJiraLiveDiagnosticTest()
         try
         {
             var result = await Mediator.Send(new IngestReleaseNotesCommand());
-            
             if (result is null)
             {
                 Snackbar?.Add("Ingestion sequence returned an empty response.", Severity.Warning);
