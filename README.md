@@ -1,45 +1,82 @@
-<img width="1024" height="434" alt="image" src="https://github.com/user-attachments/assets/36b9b132-3c56-448d-830f-d063bde788db" />
-
-# 🎓 AskEIVA: Customer Service Agent
+# 🎓 AskEIVA: Intelligent Knowledge Orchestration Platform
 
 [![Funded by: EIVA](https://img.shields.io/badge/Funded%20by-EIVA-0A2540?style=flat-square)](https://www.eiva.com)
-[![Status: Public Alpha](https://img.shields.io/badge/Status-Public%20Alpha-orange?style=flat-square)](https://github.com/lauPhilip/AskEivaNet)
+[![Status: Production Release](https://img.shields.io/badge/Status-Production%20Release-brightgreen?style=flat-square)](https://github.com/lauPhilip/AskEivaNet)
 [![Platform: .NET 10](https://img.shields.io/badge/Platform-.NET%2010-blueviolet?style=flat-square)](https://dotnet.microsoft.com)
+[![Database: Weaviate Cloud](https://img.shields.io/badge/Database-Weaviate%20Cloud-blue?style=flat-square)](https://weaviate.io)
 
-**AskEIVA** is a production-grade, AI-native knowledge orchestration platform built on Clean Architecture and Domain-Driven Design (DDD) principles. It is engineered to transform dense subsea survey instrumentation manuals, complex product specifications, and historical customer support records into an interconnected, highly traceable, and auditable intelligence ecosystem.
-
----
-
-## 🏛️ About the Project
-
-Developed as a reference implementation for an **Agentic Industrial Ecosystem**, AskEIVA serves as an intelligent engineering companion for subsea professionals. The platform specializes in guiding customer service staff through complex documentation and a large ticket pool.
-
-The platform provides a centralized hub for:
-* **Staff-Managed Bot Architecture:** Seamless configuration of domain-focused agents without altering core business rules.
-* **Knowledge Grounding:** Ensuring LLM responses are strictly anchored inside verified corporate documentation, software manuals, and historical customer service logs to completely prevent hallucinations.
-* **Topological Relationship Mapping:** Extracting implicit product, semantic hardware, and versioning associations, visually projecting them as an interactive network grid.
-* **Interaction Observability:** Providing engineering and support teams with real-time audit logs, column-level search filtering, chronological trace structures, and explicit feedback metric evaluation.
+**AskEIVA** is an enterprise-grade, AI-native knowledge orchestration platform built using **C# / .NET 10 Clean Architecture** and **Domain-Driven Design (DDD)** principles. It is engineered to ingest, chunk, vectorize, and map dense subsea survey instrumentation documentation, software manuals (NaviPac, NaviScan, NaviEdit, NaviModel), and historical helpdesk records into a traceable, highly contextual, and cross-referenced GraphRAG intelligence ecosystem.
 
 ---
 
-## 🚀 Core Capabilities & Domain Context
+## 🏛️ Project Vision & Evolution
 
-This application demonstrates production-ready agentic orchestration mapped directly to high-end marine survey domains:
+AskEIVA addresses the critical challenge of technical discovery within complex marine engineering domains. Moving beyond traditional isolated vector search tools, the platform focuses on building an interconnected **Topological Context Mesh** that mirrors real-world relations between specific software releases, hardware components, and operational support tickets.
 
-* **Entity Sequencing (Mistral AI):** Automated extraction of semantic knowledge triples (`Subject` → `Predicate` → `Object`) out of raw corporate literature, uncovering dependencies between specific software versions, hardware platforms, and operational fixes.
-* **Vectorized Knowledge (Weaviate):** Concurrent hybrid search indexing (`alpha: 0.5`) across documentation libraries and historic tickets to fetch contextual text snippets with millisecond-level turnarounds.
-* **Topological GraphRAG (vis.js):** An animated, client-side relational canvas mapping interconnected node clusters (e.g., binding version paths such as `4.6.7` to its parent software application `NaviPac` via explicit semantic edges).
-* **Asynchronous Telemetry Logging:** Decoupled background tracing loops that automatically capture every user query, generated response context, model attribute, and success execution state without blocking the interface thread.
+### 🔄 The Leap: Python Prototype to Enterprise .NET 10
+* **Prototype Stage:** Built as a Python/Streamlit script executing standalone text processing runs.
+* **Production Architecture:** Completely re-engineered into a strictly decoupled C# solution. By separating core domain behavior from infrastructure boundaries, the platform provides the EIVA engineering team with an easily maintainable codebase designed for horizontal scaling, strict type safety, and real-time background execution loops.
 
 ---
 
-## 🏗️ Technical Architecture
+## 🏗️ Clean Architecture Breakdown
 
-Adhering strictly to **Clean Architecture** parameters, the system isolates core business rules from infrastructure volatility, splitting the codebase into four separate projects inside a unified solution layout (`AskEiva.slnx`):
+The solution structural design isolates domain laws from external storage frameworks, infrastructure dependencies, and UI rendering elements, splitting the project into four distinct layers:
 
 ```text
 📁 src/
-├── 📁 AskEiva.Domain/          # Core entities (KnowledgeTriple, TicketNode), Value Objects, & Repository Contracts
-├── 📁 AskEiva.Application/     # CQRS Handlers (MediatR), validation pipelines, and business orchestrations
-├── 📁 AskEiva.Infrastructure/  # Weaviate adapters, GraphQL query generators, REST clients, and Schema Provisioners
-└── 📁 AskEiva.WebUI/           # Blazor Server UI (MudBlazor), streaming text views, and interactive canvas components
+├── 📁 AskEiva.Domain/         # Pure domain models (TicketNode, TextChunk), Value Objects, & Repository Contracts. Zero external dependencies.
+├── 📁 AskEiva.Application/    # Use cases, CQRS Command/Query Handlers (MediatR), and orchestrations (e.g., IngestDocumentationCommand).
+├── 📁 AskEiva.Infrastructure/ # Concrete adapters: Weaviate vector operations, HtmlAgilityPack public scrapers, and GraphQL engines.
+└── 📁 AskEiva.WebUI/          # Blazor Interactive Server UI (MudBlazor), real-time log monitors, and network graph visualizations.
+```
+---
+
+### Application
+
+```text
+📁AskEiva.Application/
+├── 📄 AskEiva.Application.csproj
+├── 📁 Documentation/
+│   └── 📁 Commands/ 📄 IngestDocumentationCommand.cs
+├── 📁 Graphs/
+│   ├── 📁 Commands/ 📄 BuildGlobalContextGraphCommand.cs
+│   └── 📁 Queries/  📄 GetEntityGraphQuery.cs
+├── 📁 Jira/
+│   ├── 📁 Commands/ 📄 IngestJiraIssuesCommand.cs
+│   └── 📁 Utils/    📄 AtlassianDocumentParser.cs
+├── 📁 Knowledge/
+│   └── 📁 Queries/  📄 SearchKnowledgeQuery.cs
+├── 📁 QualityAssurance/
+│   └── 📁 Commands/ 📄 ExecutePipelineEvaluationCommand.cs, 📄 SubmitSwipeFeedbackCommand.cs
+├── 📁 ReleaseNotes/
+│   └── 📁 Commands/ 📄 IngestReleaseNotesCommand.cs
+├── 📁 Telemetry/
+│   ├── 📁 Queries/  📄 GetDashboardTelemetryQuery.cs
+│   └── 📄 SyncTelemetryBroker.cs
+└── 📁 Tickets/
+    └── 📁 Commands/ 📄 IngestTicketsCommand.cs
+```
+* IngestDocumentationCommand.cs — Coordinates the reactive public HTML parsing pipeline, running the custom sliding-window text chunker and streaming nodes directly into Weaviate.
+
+* BuildGlobalContextGraphCommand.cs — Triggers background batching routines that extract semantic knowledge triples to construct cross-referenced edges across collections.
+
+* GetEntityGraphQuery.cs — Retrieves compiled graph layouts from the vector instance to render interactive customer service data maps.
+
+IngestJiraIssuesCommand.cs — Manages ingestion routines for internal engineering tasks and development tracking history.
+
+AtlassianDocumentParser.cs — Normalizes complex Atlassian Document Format (ADF) payloads into clean text strings for the chunking engine.
+
+SearchKnowledgeQuery.cs — Executes optimized hybrid semantic-keyword searches to anchor RAG prompts and prevent LLM hallucinations.
+
+ExecutePipelineEvaluationCommand.cs — Runs automated evaluation loops against prompt outputs to verify grounding accuracy and system quality.
+
+SubmitSwipeFeedbackCommand.cs — Saves human-in-the-loop interaction scores (upvotes/downvotes) to optimize future search rankings.
+
+IngestReleaseNotesCommand.cs — Slices and segments EIVA software product release notes and deployment manifests into traceable reference points.
+
+GetDashboardTelemetryQuery.cs — Aggregates live schema counts (documents, tickets, release notes) to drive the state-aware administrative UX safeguards.
+
+SyncTelemetryBroker.cs — Relays background processing diagnostics and scraper milestones to the Blazor console interface in real-time.
+
+IngestTicketsCommand.cs — Processes historical, multi-turn support records into embedded data objects for helpdesk triage tracking.
