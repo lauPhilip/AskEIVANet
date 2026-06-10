@@ -1,4 +1,4 @@
-# 🎓 AskEIVA: Intelligent Knowledge Orchestration Platform
+# 🎓 AskEIVA: Customer Service Agent Platform
 
 [![Funded by: EIVA](https://img.shields.io/badge/Funded%20by-EIVA-0A2540?style=flat-square)](https://www.eiva.com)
 [![Status: Pre-Release](https://img.shields.io/badge/Pre-%20Release-brightgreen?style=flat-square)](https://github.com/lauPhilip/AskEivaNet)
