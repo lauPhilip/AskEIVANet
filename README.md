@@ -32,7 +32,7 @@ The solution structural design isolates domain laws from external storage framew
 ```
 ---
 
-### Application
+### AskEIVA.Application
 
 ```text
 📁AskEiva.Application/
@@ -58,25 +58,80 @@ The solution structural design isolates domain laws from external storage framew
     └── 📁 Commands/ 📄 IngestTicketsCommand.cs
 ```
 * ```IngestDocumentationCommand.cs```: Coordinates the reactive public HTML parsing pipeline, running the custom sliding-window text chunker and streaming nodes directly into Weaviate.
-
 * ```BuildGlobalContextGraphCommand.cs```: Triggers background batching routines that extract semantic knowledge triples to construct cross-referenced edges across collections.
-
 * ```GetEntityGraphQuery.cs```: Retrieves compiled graph layouts from the vector instance to render interactive customer service data maps.
-
 * ```IngestJiraIssuesCommand.cs```: Manages ingestion routines for internal engineering tasks and development tracking history.
-
 * ```AtlassianDocumentParser.cs```: Normalizes complex Atlassian Document Format (ADF) payloads into clean text strings for the chunking engine.
-
 * ```SearchKnowledgeQuery.cs```: Executes optimized hybrid semantic-keyword searches to anchor RAG prompts and prevent LLM hallucinations.
-
 * ```ExecutePipelineEvaluationCommand.cs```: Runs automated evaluation loops against prompt outputs to verify grounding accuracy and system quality.
-
 * ```SubmitSwipeFeedbackCommand.cs```: Saves human-in-the-loop interaction scores (upvotes/downvotes) to optimize future search rankings.
-
 * ```IngestReleaseNotesCommand.cs```: Slices and segments EIVA software product release notes and deployment manifests into traceable reference points.
-
 * ```GetDashboardTelemetryQuery.cs```: Aggregates live schema counts (documents, tickets, release notes) to drive the state-aware administrative UX safeguards.
-
 * ```SyncTelemetryBroker.cs```: Relays background processing diagnostics and scraper milestones to the Blazor console interface in real-time.
-
 * ```IngestTicketsCommand.cs```: Processes historical, multi-turn support records into embedded data objects for helpdesk triage tracking.
+
+---
+
+### AskEIVA.Domain
+
+```text
+📁 AskEiva.Domain/
+├── 📄 AskEiva.Domain.csproj
+├── 📁 Entities/
+│   ├── 📄 ApplicationUser.cs
+│   ├── 📄 DocumentationNode.cs
+│   ├── 📄 EvaluationFeedbackLog.cs
+│   ├── 📄 GraphContextChain.cs.cs
+│   ├── 📄 SoftwareReleaseNode.cs
+│   └── 📄 TicketNode.cs
+├── 📁 Repositories/
+│   ├── 📄 IDocumentationRepository.cs
+│   ├── 📄 IGraphRepository.cs
+│   ├── 📄 IKnowledgeRetrievalRepository.cs
+│   └── 📄 ITicketRepository.cs
+├── 📁 Services/
+│   ├── 📄 GraphMetricsDto.cs
+│   ├── 📄 IDocumentationCrawler.cs
+│   ├── 📄 IFreshdeskService.cs
+│   ├── 📄 IJiraService.cs
+│   ├── 📄 ILlmOrchestrationService.cs
+│   ├── 📄 IMistralChatService.cs
+│   ├── 📄 IMistralDistillationService.cs
+│   ├── 📄 IReleaseNotesScraper.cs
+│   ├── 📄 JiraConfiguration.cs
+│   └── 📄 JiraModels.cs
+├── 📁 Utilities/
+│   └── 📄 TextSplitter.cs
+└── 📁 ValueObjects/
+    ├── 📄 ChatTurn.cs
+    ├── 📄 RetrievalMatch.cs
+    └── 📄 TextChunk.cs
+```
+
+* ```ApplicationUser.cs```: identity logic for users interacting with the system for login and sign up.
+* ```EvaluationFeedbackLog.cs```: Tracks evaluation benchmarks, prompt metrics, and trace flags to detect and grade generation performance.
+* ```GraphContextChain.cs.cs```: Represents compiled, highly relational connection sequences linking separate vector fields across the knowledge database.
+* ```SoftwareReleaseNode.cs```: Domain representation of an individual product version artifact, patch record, or deployment manifest data asset.
+* ```TicketNode.cs```: Core domain entity modeling historical customer support conversations, metadata contexts, and original issue logs.
+* ```IDocumentationRepository.cs```: Data access abstraction interface managing batch storage operations for documentation chunks.
+* ```IGraphRepository.cs```: Defines repository mutations required to link cross-collection indices into structured graph relationship nodes.
+* ```IKnowledgeRetrievalRepository.cs```: Abstraction layer managing vector lookups, global database count aggregations, and raw logging retrieval functions.
+* ```ITicketRepository.cs```: Storage boundary interface defining contract requirements for persistence of parsed helpdesk interactions.
+* ```GraphMetricsDto.cs```: Data transfer object standardizing structural topology statistics across the extraction system.
+* ```IDocumentationCrawler.cs```: Interface defining the unbuffered asynchronous streaming parameters used to extract data assets from public websites.
+* ```IFreshdeskService.cs```: Service boundary blueprint abstracting low-level operations and configurations with the support host system.
+* ```IJiraService.cs```: Standardizes access vectors for fetching external issue tickets and development backlogs from Atlassian platforms.
+* ```ILlmOrchestrationService.cs```: Boundary defining how contextual data blocks are combined with core system instructions to guide model interactions.
+* ```IMistralChatService.cs```: Contract for generating completions and model interaction calls against the downstream Mistral API endpoint layer.
+* ```IMistralDistillationService.cs```: Core abstraction engine interface defining workflows for pulling named entity relations and knowledge triples out of text logs.
+* ```IReleaseNotesScraper.cs```: Abstraction specification outlining tasks for downloading and indexing binary package release summaries.
+* ```JiraConfiguration.cs```: Holds environment keys, host bindings, and connectivity properties required to communicate with external project boards.
+* ```JiraModels.cs```: Maps incoming Atlassian payload profiles to strongly-typed models before passing them to the application layer.
+* ```TextSplitter.cs```: Core utility provider implementing sliding-window mathematics to slice dense technical logs safely at natural word bounds.
+* ```ChatTurn.cs```: Immutable value object capturing a single query-response transaction block within a user session thread.
+* ```RetrievalMatch.cs```: Models a prioritized fragment returned by a vector query pass, containing relevance scores and distance indicators.
+* ```TextChunk.cs```: Value object modeling an individual segmented passage of plain text along with its identifying metadata tags.
+
+---
+
+### AskEIVA.Infrastructure
