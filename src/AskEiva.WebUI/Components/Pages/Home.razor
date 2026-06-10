@@ -161,11 +161,9 @@
         {
             // 💡 DYNAMIC LOADING: Reuses your generic count repository methods to pull fresh database sizes
             _knowledgeNodeCount = await KnowledgeRepo.GetTotalClassCountAsync("KnowledgeNode");
-            _docLibraryCount = await KnowledgeRepo.GetDistinctSourceCountAsync("DocumentLibrary", "document_id");
+            _docLibraryCount = await KnowledgeRepo.GetDistinctSourceCountAsync("DocumentationLibrary", "document_id");
             _releaseNodeCount = await KnowledgeRepo.GetTotalClassCountAsync("SoftwareReleaseNode");
-            
-            // Estimates a quick counter baseline for graph connections
-            var graphMesh = await KnowledgeRepo.SearchGraphTriplesAsync("", limit: 100);
+            var graphMesh = await KnowledgeRepo.SearchGraphTriplesAsync("NaviScan", limit: 499);
             _graphTripletsCount = graphMesh?.Count() ?? 0;
         }
         catch (Exception ex)

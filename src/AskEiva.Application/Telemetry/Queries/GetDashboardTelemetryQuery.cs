@@ -10,10 +10,13 @@ namespace AskEiva.Application.Telemetry.Queries;
 
 public record GetDashboardTelemetryQuery : IRequest<TelemetryDashboardResult>;
 
+// 💡 FIXED: Included TotalSoftwareReleaseChunks right inside the MediatR communication DTO contract!
 public record TelemetryDashboardResult(
     int TotalUniqueDocuments,
     int TotalUniqueTickets,
     int TotalSoftwareReleases,
+    int TotalSoftwareReleaseChunks, 
+    int TotalGraphContextChains,
     List<InteractionLogItemDto> Logs
 );
 
@@ -34,19 +37,23 @@ public class GetDashboardTelemetryQueryHandler : IRequestHandler<GetDashboardTel
         _retrievalRepository = retrievalRepository;
     }
 
-public async Task<TelemetryDashboardResult> Handle(GetDashboardTelemetryQuery request, CancellationToken cancellationToken)
+    public async Task<TelemetryDashboardResult> Handle(GetDashboardTelemetryQuery request, CancellationToken cancellationToken)
     {
+        // Parent distinct trackers
         var docsTask = _retrievalRepository.GetDistinctSourceCountAsync("DocumentationLibrary", "document_id");
         var ticketsTask = _retrievalRepository.GetDistinctSourceCountAsync("KnowledgeNode", "source_id"); 
-        var releaseTask = _retrievalRepository.GetDistinctSourceCountAsync("SoftwareReleaseNode", "source_id"); 
-        var logsTask = _retrievalRepository.GetRawInteractionLogsAsync(limit: 50);
+        var releaseTask = _retrievalRepository.GetDistinctSourceCountAsync("SoftwareReleaseNode", "full_version_title"); 
+        var graphChainsTask = _retrievalRepository.GetDistinctSourceCountAsync("GraphContextChain","ticket_id");
+        var releaseChunksTask = _retrievalRepository.GetTotalClassCountAsync("SoftwareReleaseNode");
+        
+        var logsTask = _retrievalRepository.GetRawInteractionLogsAsync(limit: 500);
 
-        await Task.WhenAll(docsTask, ticketsTask, releaseTask);
+        // Parallel task processing pass
+        await Task.WhenAll(docsTask, ticketsTask, releaseTask, releaseChunksTask);
 
         var logsResult = await logsTask;
         var activeLogs = new List<InteractionLogItemDto>();
 
-        // 2. Parse out the InteractionLog list properties matching your dashboard view layout
         if (logsResult.ValueKind != JsonValueKind.Undefined &&
             logsResult.TryGetProperty("data", out var data) &&
             data.TryGetProperty("Get", out var get) &&
@@ -77,11 +84,13 @@ public async Task<TelemetryDashboardResult> Handle(GetDashboardTelemetryQuery re
             }
         }
 
-        // 3. Return the fully computed counts right out of our repository task results
+        // Return the fully computed counts mapped to contract indices
         return new TelemetryDashboardResult(
             TotalUniqueDocuments: docsTask.Result,
             TotalUniqueTickets: ticketsTask.Result, 
             TotalSoftwareReleases: releaseTask.Result,
+            TotalSoftwareReleaseChunks: releaseChunksTask.Result,
+            TotalGraphContextChains: graphChainsTask.Result,
             Logs: activeLogs
         );
     }

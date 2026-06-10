@@ -66,7 +66,7 @@
                 <div>
                     <MudText Typo="Typo.caption" Class="font-weight-bold" Style="color: #64748B; text-transform: uppercase;">Software Releases</MudText>
                     <MudText Typo="Typo.h4" Class="font-weight-bold" Style="color: #0A2540;">@_releaseCount.ToString("N0")</MudText>
-                    <MudText Typo="Typo.caption" Style="color: #EA580C; font-weight: 500;">● Active Release Chunks</MudText>
+                    <MudText Typo="Typo.caption" Style="color: #EA580C; font-weight: 500;">● Active Manifest Package Files</MudText>
                 </div>
                 <MudIcon Icon="@Icons.Material.Filled.NewReleases" Style="color: #F1F5F9; font-size: 3rem;" />
             </MudPaper>
@@ -159,7 +159,6 @@
                         <MudText Typo="Typo.h6" Style="color: #0A2540; font-weight: 600;">Documentation Library</MudText>
                     </div>
                     
-                    @* 💡 STATE-AWARE CONTROLLER: Disables dynamically if Weaviate already contains documents *@
                     <MudButton Variant="Variant.Filled"
                                Size="Size.Small"
                                StartIcon="@(_documentCount > 0 ? Icons.Material.Filled.CloudDone : Icons.Material.Filled.CloudDownload)"
@@ -186,7 +185,7 @@
                        target="_blank" 
                        style="color: #0284C7; font-weight: bold; text-decoration: none; border-bottom: 1px dashed #0284C7;"
                        class="hover-link">
-                        EIVA Freshdesk Support Portal <MudIcon Icon="@Icons.Material.Filled.OpenInNew" Size="Size.Small" Style="font-size: 0.9rem; vertical-align: text-bottom;" />
+                         EIVA Freshdesk Support Portal <MudIcon Icon="@Icons.Material.Filled.OpenInNew" Size="Size.Small" Style="font-size: 0.9rem; vertical-align: text-bottom;" />
                     </a>
                 </MudText>
                 
@@ -216,12 +215,23 @@
                     </div>
                     
                     <MudButton Variant="Variant.Filled" 
-                               Style="background-color: #C5DC22; color: #0A2540; font-weight: bold; box-shadow: none;" 
                                Size="Size.Small" 
-                               StartIcon="@Icons.Material.Filled.CloudDownload" 
+                               StartIcon="@(_releaseChunksCount > 0 ? Icons.Material.Filled.CloudDone : Icons.Material.Filled.CloudDownload)" 
+                               Style="@(_releaseChunksCount > 0 ? "background-color: #E2E8F0; color: #64748B; font-weight: bold; box-shadow: none;" : "background-color: #C5DC22; color: #0A2540; font-weight: bold; box-shadow: none;")" 
                                OnClick="TriggerReleaseNotesScrapeAsync"
-                               Disabled="_isScraping">
-                        @(_isScraping ? "Parsing Manifest PDF..." : "Sync Latest Release Notes")
+                               Disabled="@(_isScraping || _releaseChunksCount > 0)">
+                        @if (_isScraping)
+                        {
+                            <span>Parsing Manifest PDF...</span>
+                        }
+                        else if (_releaseChunksCount > 0)
+                        {
+                            <span>Releases Vectorized</span>
+                        }
+                        else
+                        {
+                            <span>Sync Latest Release Notes</span>
+                        }
                     </MudButton>
                 </div>
                 <MudText Typo="Typo.body2" Class="mb-4">
@@ -230,16 +240,29 @@
                        target="_blank" 
                        style="color: #0284C7; font-weight: bold; text-decoration: none; border-bottom: 1px dashed #0284C7;"
                        class="hover-link">
-                        EIVA Download Site <MudIcon Icon="@Icons.Material.Filled.OpenInNew" Size="Size.Small" Style="font-size: 0.9rem; vertical-align: text-bottom;" />
+                         EIVA Download Site <MudIcon Icon="@Icons.Material.Filled.OpenInNew" Size="Size.Small" Style="font-size: 0.9rem; vertical-align: text-bottom;" />
                     </a>
                 </MudText>
 
-                <MudAlert Severity="Severity.Normal" NoIcon="true" Dense="true" Class="mt-2" Style="background-color: #F8FAFC; border: 1px solid #E2E8F0; color: #334155;">
-                    <div class="d-flex align-center gap-2 font-small" style="font-size: 0.85rem;">
-                        <MudIcon Icon="@Icons.Material.Filled.Info" Size="Size.Small" Style="color: #EA580C;" />
-                        <span>System tracking matches historical data points across <strong>@_releaseCount</strong> localized package nodes.</span>
-                    </div>
-                </MudAlert>
+                <MudGrid>
+                    <MudItem xs="12" sm="6">
+                        <MudAlert Severity="Severity.Normal" NoIcon="true" Dense="true" Class="mt-2" Style="background-color: #F8FAFC; border: 1px solid #E2E8F0; color: #334155;">
+                            <div class="d-flex align-center gap-2" style="font-size: 0.85rem;">
+                                <MudIcon Icon="@Icons.Material.Filled.Info" Size="Size.Small" Style="color: #EA580C;" />
+                                <span>System matching records tracked across <strong>@_releaseCount</strong> structured localized release versions.</span>
+                            </div>
+                        </MudAlert>
+                    </MudItem>
+                    
+                    <MudItem xs="12" sm="6">
+                        <MudAlert Severity="Severity.Normal" NoIcon="true" Dense="true" Class="mt-2" Style="@(_releaseChunksCount > 0 ? "background-color: #ECFDF5; border: 1px solid #A7F3D0; color: #065F46;" : "background-color: #FFFBEB; border: 1px solid #FDE68A; color: #92400E;")">
+                            <div class="d-flex align-center gap-2" style="font-size: 0.85rem;">
+                                <MudIcon Icon="@(_releaseChunksCount > 0 ? Icons.Material.Filled.CheckCircle : Icons.Material.Filled.Pending)" Size="Size.Small" Style="@(_releaseChunksCount > 0 ? "color: #10B981;" : "color: #F59E0B;")" />
+                                <span>Extracted High-Density Vector Fragments: <strong>@_releaseChunksCount.ToString("N0") Chunks</strong> stored in memory.</span>
+                            </div>
+                        </MudAlert>
+                    </MudItem>
+                </MudGrid>
             </MudPaper>
         </MudItem>
     </MudGrid>
@@ -257,11 +280,22 @@
                     
                     <MudButton Variant="Variant.Filled" 
                                Size="Size.Small"
-                               StartIcon="@Icons.Material.Filled.PlayCircleFilled"
+                               StartIcon="@(_ticketCount > 0 ? Icons.Material.Filled.CloudDone : Icons.Material.Filled.PlayCircleFilled)"
                                OnClick="TriggerTicketIngestionPipeline"
-                               Disabled="@_isSyncing"
-                               Style="background-color: #C5DC22; font-weight: bold; box-shadow: none;">
-                        @(_isSyncing ? "Executing Global Run..." : "Run Core Production Sync")
+                               Disabled="@(_isSyncing || _ticketCount > 0)"
+                               Style="@(_ticketCount > 0 ? "background-color: #E2E8F0; color: #64748B; font-weight: bold; box-shadow: none;" : "background-color: #C5DC22; color: #0A2540; font-weight: bold; box-shadow: none;")">
+                        @if (_isSyncing)
+                        {
+                            <span>Executing Global Run...</span>
+                        }
+                        else if (_ticketCount > 0)
+                        {
+                            <span>Production Workspace Sync'd</span>
+                        }
+                        else
+                        {
+                            <span>Run Core Production Sync</span>
+                        }
                     </MudButton>
                 </div>
                 <MudText Typo="Typo.body2" Class="mb-4">
@@ -270,7 +304,7 @@
                        target="_blank" 
                        style="color: #0284C7; font-weight: bold; text-decoration: none; border-bottom: 1px dashed #0284C7;"
                        class="hover-link">
-                        Freshdesk Tickets <MudIcon Icon="@Icons.Material.Filled.OpenInNew" Size="Size.Small" Style="font-size: 0.9rem; vertical-align: text-bottom;" />
+                         Freshdesk Tickets <MudIcon Icon="@Icons.Material.Filled.OpenInNew" Size="Size.Small" Style="font-size: 0.9rem; vertical-align: text-bottom;" />
                     </a>
                 </MudText>
 
@@ -334,7 +368,6 @@
 
     <MudGrid>
         <MudItem xs="12">
-            @* 💡 DEPRECATION STYLING: Dimmed opacity visibly isolates deactivated tenant layouts *@
             <MudPaper Elevation="0" Class="pa-5" Style="border: 1px solid #E2E8F0; border-radius: 8px; background: #FFFFFF; opacity: 0.65;">
                 <div class="d-flex align-center justify-space-between mb-3">
                     <div class="d-flex align-center gap-3">
@@ -342,7 +375,6 @@
                         <MudText Typo="Typo.h6" Style="color: #64748B; font-weight: 600;">Jira Integration (Deactivated)</MudText>
                     </div>
                     
-                    @* 💡 PERMANENT LOCK: Button disabled via layout properties *@
                     <MudButton Variant="Variant.Filled" 
                                Style="background-color: #E2E8F0; color: #94A3B8; font-weight: bold; box-shadow: none;" 
                                Size="Size.Small" 
@@ -365,12 +397,25 @@
 
         <div class="d-flex flex-column gap-3">
             <div class="d-flex align-center gap-4">
+                
+                @* 💡 FIXED MESH BUILDER STATE CONTROLLER: Automatically goes grey and blocks execution once chains exist inside Weaviate *@
                 <MudButton Variant="Variant.Filled"  
-                           Disabled="@StateStore.IsProcessing"
+                           Disabled="@(StateStore.IsProcessing || _graphChainCount > 0)"
                            OnClick="TriggerGlobalContextMeshGeneration"
-                           StartIcon="@Icons.Material.Filled.Hub"
-                           Style="background-color: #C5DC22; font-weight: bold;">
-                    @(StateStore.IsProcessing ? "DISTILLING MESH..." : "BUILD DYNAMIC GRAPH")
+                           StartIcon="@(_graphChainCount > 0 ? Icons.Material.Filled.Hub : Icons.Material.Filled.Hub)"
+                           Style="@(_graphChainCount > 0 ? "background-color: #E2E8F0; color: #64748B; font-weight: bold;" : "background-color: #C5DC22; color: #0A2540; font-weight: bold;")">
+                    @if (StateStore.IsProcessing)
+                    {
+                        <span>DISTILLING MESH...</span>
+                    }
+                    else if (_graphChainCount > 0)
+                    {
+                        <span>Graph Mesh Populated</span>
+                    }
+                    else
+                    {
+                        <span>BUILD DYNAMIC GRAPH</span>
+                    }
                 </MudButton>
 
                 @if (StateStore.IsProcessing)
@@ -423,6 +468,8 @@
     private int _documentCount = 0;
     private int _ticketCount = 0;
     private int _releaseCount = 0;
+    private int _releaseChunksCount = 0; 
+    private int _graphChainCount = 0; // 💡 NEW: Discovered cross-reference graph link chain index counter variable
     private string _searchString = "";
     private List<InteractionLogItemDto> _interactionLogs = new();
 
@@ -447,7 +494,7 @@
         InvokeAsync(StateHasChanged);
     }
 
-private async Task TriggerDocumentationIngestionPipeline()
+    private async Task TriggerDocumentationIngestionPipeline()
     {
         if (_documentCount > 0 || _isCrawlingDocs) return;
 
@@ -456,16 +503,13 @@ private async Task TriggerDocumentationIngestionPipeline()
 
         try
         {
-            Snackbar?.Add("Connecting to Freshdesk API solution matrices...", Severity.Info);
-
-            // 💡 FIXED: Send the explicit global keyword token.
-            // The upgraded crawler will automatically discover and ingest all categories.
+            Snackbar?.Add("Connecting to public HTML solutions portal scrape...", Severity.Info);
             var command = new IngestDocumentationCommand(new List<string> { "GLOBAL_RUN" });
             var result = await Mediator.Send(command);
 
             if (result.Success && result.ArticlesProcessed > 0)
             {
-                Snackbar?.Add($"🎉 Harvest Complete! Vectorized {result.ArticlesProcessed} manuals into {result.TotalChunksCreated} vector chunks!", Severity.Success);
+                Snackbar?.Add($"🎉 Harvest Complete! Vectorized {result.ArticlesProcessed} manuals into {result.TotalChunksCreated} chunks!", Severity.Success);
             }
             else
             {
@@ -487,7 +531,7 @@ private async Task TriggerDocumentationIngestionPipeline()
 
     private async Task TriggerGlobalContextMeshGeneration()
     {
-        if (StateStore.IsProcessing) return;
+        if (_graphChainCount > 0 || StateStore.IsProcessing) return;
 
         StateStore.IsProcessing = true;
         StateStore.UpdateProgress(0, 0, "Initialization", "Spawning background context mesh processing core...");
@@ -523,6 +567,8 @@ private async Task TriggerDocumentationIngestionPipeline()
             finally
             {
                 StateStore.IsProcessing = false;
+                // Fetch updated query summaries right at completion step to apply the locks seamlessly
+                await FetchDashboardTelemetryAsync();
                 await InvokeAsync(StateHasChanged);
             }
         });
@@ -585,6 +631,8 @@ private async Task TriggerDocumentationIngestionPipeline()
             _ticketCount = result.TotalUniqueTickets;
             _releaseCount = result.TotalSoftwareReleases;
             _interactionLogs = result.Logs;
+            _releaseChunksCount = result.TotalSoftwareReleaseChunks; 
+            _graphChainCount = result.TotalGraphContextChains;
         }
         catch (Exception ex)
         {
@@ -599,6 +647,8 @@ private async Task TriggerDocumentationIngestionPipeline()
 
     private async Task TriggerTicketIngestionPipeline()
     {
+        if (_ticketCount > 0 || _isSyncing) return;
+
         _isSyncing = true;
         _liveLogStream.Clear();
         _processedTicketsHistory.Clear();
@@ -623,6 +673,8 @@ private async Task TriggerDocumentationIngestionPipeline()
 
     private async Task TriggerReleaseNotesScrapeAsync()
     {
+        if (_releaseChunksCount > 0 || _isScraping) return;
+
         _isScraping = true;
         StateHasChanged();
 
