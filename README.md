@@ -57,7 +57,7 @@ The solution structural design isolates domain laws from external storage framew
 └── 📁 Tickets/
     └── 📁 Commands/ 📄 IngestTicketsCommand.cs
 ```
-* IngestDocumentationCommand.cs — Coordinates the reactive public HTML parsing pipeline, running the custom sliding-window text chunker and streaming nodes directly into Weaviate.
+* ```IngestDocumentationCommand.cs``` — Coordinates the reactive public HTML parsing pipeline, running the custom sliding-window text chunker and streaming nodes directly into Weaviate.
 
 * BuildGlobalContextGraphCommand.cs — Triggers background batching routines that extract semantic knowledge triples to construct cross-referenced edges across collections.
 
