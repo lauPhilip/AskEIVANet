@@ -57,8 +57,6 @@ namespace AskEiva.Infrastructure.Repositories
                 _logger.LogCritical(ex, "An unhandled exception collapsed the global schema configuration loop.");
             }
         }
-
-        // 💡 FACTORY METHOD: Formats the exact layout schema config for your public helpdesk knowledge base elements
         private object CreateDocumentationLibrarySchema()
         {
             return new
@@ -110,6 +108,7 @@ namespace AskEiva.Infrastructure.Repositories
                     @class = "KnowledgeNode",
                     description = "Unified multi-source semantic vector store cluster mapping historical context inputs for AskEiva.",
                     vectorizer = "text2vec-mistral",
+                    vectorIndexType="hnsw",
                     moduleConfig = new
                     {
                         @text2vec_mistral = new { }
@@ -163,6 +162,7 @@ namespace AskEiva.Infrastructure.Repositories
                     @class = "GraphContextChain",
                     description = "Stores multi-hop context paths linking customer tickets directly to technical scenarios and software updates text spans.",
                     vectorizer = "text2vec-mistral",
+                    vectorIndexType="hnsw",
                     moduleConfig = new
                     {
                         @text2vec_mistral = new { model = "mistral-embed", type = "text" }
@@ -210,6 +210,7 @@ namespace AskEiva.Infrastructure.Repositories
                     @class = "JiraIssueNode",
                     description = "Stores segmented, semantic text chunks extracted from EIVA's Atlassian Jira issue logs.",
                     vectorizer = "text2vec-mistral",
+                    vectorIndexType="hnsw",
                     properties = new[]
                     {
                         new { name = "jira_id", dataType = new[] { "string" } },
@@ -239,6 +240,7 @@ namespace AskEiva.Infrastructure.Repositories
                 @class = "SoftwareReleaseNode",
                 description = "Textual chunks and metadata harvested from product software releases and patches",
                 vectorizer = "text2vec-mistral",
+                vectorIndexType="hnsw",
                 moduleConfig = new
                 {
                     @text2vec_mistral = new { model = "mistral-embed", type = "text" }
