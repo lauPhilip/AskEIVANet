@@ -135,3 +135,83 @@ The solution structural design isolates domain laws from external storage framew
 ---
 
 ### AskEIVA.Infrastructure
+
+```text
+📁 AskEiva.Infrastructure/
+├── 📄 AskEiva.Infrastructure.csproj
+├── 📁 Repositories/
+│   ├── 📄 DocumentationRepository.cs
+│   ├── 📄 GraphRepository.cs
+│   ├── 📄 KnowledgeRetrievalRepository.cs
+│   ├── 📄 TicketRepository.cs
+│   ├── 📄 UserRepository.cs
+│   ├── 📄 WeaviateSchemaProvisioner.cs
+│   └── 📄 WeaviateUserStore.cs
+└── 📁 Services/
+    ├── 📄 DocumentationRepository.cs
+    ├── 📄 DocumentationCrawler.cs
+    ├── 📄 FreshdeskService.cs
+    ├── 📄 JiraService.cs
+    ├── 📄 MistralChatService.cs
+    ├── 📄 MistralDistillationService.cs
+    └── 📄 ReleaseNotesScraper.cs
+```
+
+* ```DocumentationRepository.cs```: Implements data access mappings for sending split documentation vectors to Weaviate cloud collections.
+* ```KnowledgeRetrievalRepository.cs```: Executes complex GraphQL aggregation queries and hybrid vector-keyword searches against Weaviate cluster indices.
+* ```TicketRepository.cs```: Implements support ticket batch mutations, handling raw string sanitization and vector persistence operations.
+* ```UserRepository.cs```: Connects custom administration security context records with low-level storage tables.
+* ```WeaviateSchemaProvisioner.cs```: Runs automated structural health steps on startup to declare classes, configurations, and vector spacing choices if they don't exist.
+* ```WeaviateUserStore.cs```: Implements ASP.NET Core Identity store abstractions, routing user authentication lookups directly into the vector database.
+* ```DocumentationCrawler.cs```: Integrates the direct public-facing HTML web crawler engine, using `HtmlAgilityPack` to build an unbuffered streaming pipeline.
+* ```FreshdeskService.cs```: Manages explicit platform communication wrappers and configuration schemas for helpdesk platform environments.
+* ```JiraService.cs```: Implements the live back-end connection logic to poll, extract, and structure incoming ticket indices from external development projects.
+* ```MistralChatService.cs```: Handles outgoing HTTP payloads and response parsing with the cloud-hosted Mistral AI completion APIs.
+* ```MistralDistillationService.cs```: Coordinates the entity-extraction workflows, letting the model analyze blocks of raw text to output clean data triples.
+* ```ReleaseNotesScraper.cs```: Implements custom binary asset extraction logic to pull text segments and build updates directly from software patch manifests.
+
+---
+
+### AskEIVA.WebUI
+
+```text
+📁 AskEiva.WebUI/
+├── 📄 AskEiva.WebUI.csproj
+├── 📄 Program.cs
+├── 📄 appsettings.json
+├── 📄 appsettings.Development.json
+├── 📄 release_notes_manifest.json
+├── 📁 Components/
+│   ├── 📄 App.razor
+│   ├── 📄 Routes.razor
+│   ├── 📄 _Imports.razor
+│   ├── 📁 Account/
+│   │   ├── 📁 Pages/
+│   │   │   ├── 📁 Manage/
+│   │   │   ├── 📄 _Imports.razor
+│   │   │   ├── 📄 Login.razor
+│   │   │   ├── 📄 Register.razor
+│   │   └── 📁 Shared/
+│   ├── 📁 Layout/
+│   │   ├── 📄 MainLayout.razor
+│   │   ├── 📄 MainLayout.razor.css
+│   │   ├── 📄 ReconnectModal.razor
+│   │   ├── 📄 ReconnectModal.razor.css
+│   │   └── 📄 ReconnectModal.razor.js
+│   └── 📁 Pages/
+│       ├── 📄 Chat.razor
+│       ├── 📄 ConfigurationPortal.razor
+│       ├── 📄 EvaluationDashboard.razor
+│       ├── 📄 GraphRAG.razor
+│       ├── 📄 Home.razor
+├── 📁 Models/
+│   └── 📄 MeshBuildStateStore.cs
+├── 📁 Properties/
+│   └── 📄 launchSettings.json
+└── 📁 wwwroot/
+    ├── 📁 lib/
+    ├── 📄 app.css
+    └── 📄 favicon.png
+```
+
+* TODO: Explain WebUI files
