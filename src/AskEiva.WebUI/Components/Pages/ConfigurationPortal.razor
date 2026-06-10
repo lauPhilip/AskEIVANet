@@ -447,8 +447,7 @@
         InvokeAsync(StateHasChanged);
     }
 
-    @* 💡 CORE CRAWLER METHOD: Triggers MediatR pipeline configuration sweep *@
-    private async Task TriggerDocumentationIngestionPipeline()
+private async Task TriggerDocumentationIngestionPipeline()
     {
         if (_documentCount > 0 || _isCrawlingDocs) return;
 
@@ -457,19 +456,20 @@
 
         try
         {
-            // Array of specific targeted category strings extracted from public solution endpoints
-            var categoryPoolIds = new List<string> { "4300055112", "4300062115" }; 
-            
-            var command = new IngestDocumentationCommand(categoryPoolIds);
+            Snackbar?.Add("Connecting to Freshdesk API solution matrices...", Severity.Info);
+
+            // 💡 FIXED: Send the explicit global keyword token.
+            // The upgraded crawler will automatically discover and ingest all categories.
+            var command = new IngestDocumentationCommand(new List<string> { "GLOBAL_RUN" });
             var result = await Mediator.Send(command);
 
-            if (result.Success)
+            if (result.Success && result.ArticlesProcessed > 0)
             {
-                Snackbar?.Add($"Success! Synchronized {result.ArticlesProcessed} manuals.", Severity.Success);
+                Snackbar?.Add($"🎉 Harvest Complete! Vectorized {result.ArticlesProcessed} manuals into {result.TotalChunksCreated} vector chunks!", Severity.Success);
             }
             else
             {
-                Snackbar?.Add($"Crawl completed with notes: {result.Message}", Severity.Warning);
+                Snackbar?.Add("Sync run completed, but no new documents were found.", Severity.Warning);
             }
 
             await FetchDashboardTelemetryAsync();

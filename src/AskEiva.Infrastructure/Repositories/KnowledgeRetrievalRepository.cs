@@ -55,7 +55,7 @@ public class KnowledgeRetrievalRepository : IKnowledgeRetrievalRepository
                   url
                   _additional { score }
                 }
-                DocumentLibrary(
+                DocumentationLibrary(
                   limit: {{limitPerCollection}}
                   hybrid: { query: "{{userQuery}}", alpha: 0.5 }
                 ) {
@@ -94,11 +94,18 @@ public class KnowledgeRetrievalRepository : IKnowledgeRetrievalRepository
             {
                 foreach (var node in ticketNodes.EnumerateArray())
                 {
-                    float score = 0.0f;
-                    if (node.TryGetProperty("_additional", out var addProp) && addProp.TryGetProperty("score", out var scoreProp))
+                float score = 0.0f;
+                if (node.TryGetProperty("_additional", out var addProp))
+                {
+                    if (addProp.TryGetProperty("score", out var scoreProp))
                     {
                         float.TryParse(scoreProp.GetRawText(), out score);
                     }
+                    else if (addProp.TryGetProperty("Score", out var upperScoreProp))
+                    {
+                        float.TryParse(upperScoreProp.GetRawText(), out score);
+                    }
+                }
 
                     matches.Add(new RetrievalMatch(
                         SourceId: node.GetProperty("source_id").GetString() ?? string.Empty,
@@ -112,15 +119,22 @@ public class KnowledgeRetrievalRepository : IKnowledgeRetrievalRepository
                 }
             }
 
-            if (root.TryGetProperty("DocumentLibrary", out var docNodes) && docNodes.ValueKind == JsonValueKind.Array)
+            if (root.TryGetProperty("DocumentationLibrary", out var docNodes) && docNodes.ValueKind == JsonValueKind.Array)
             {
                 foreach (var node in docNodes.EnumerateArray())
                 {
-                    float score = 0.0f;
-                    if (node.TryGetProperty("_additional", out var addProp) && addProp.TryGetProperty("score", out var scoreProp))
+                float score = 0.0f;
+                if (node.TryGetProperty("_additional", out var addProp))
+                {
+                    if (addProp.TryGetProperty("score", out var scoreProp))
                     {
                         float.TryParse(scoreProp.GetRawText(), out score);
                     }
+                    else if (addProp.TryGetProperty("Score", out var upperScoreProp))
+                    {
+                        float.TryParse(upperScoreProp.GetRawText(), out score);
+                    }
+                }
 
                     matches.Add(new RetrievalMatch(
                         SourceId: node.TryGetProperty("document_id", out var idProp) ? idProp.GetString() ?? string.Empty : string.Empty,
@@ -138,11 +152,18 @@ public class KnowledgeRetrievalRepository : IKnowledgeRetrievalRepository
             {
                 foreach (var node in releaseNodes.EnumerateArray())
                 {
-                    float score = 0.0f;
-                    if (node.TryGetProperty("_additional", out var addProp) && addProp.TryGetProperty("score", out var scoreProp))
+                float score = 0.0f;
+                if (node.TryGetProperty("_additional", out var addProp))
+                {
+                    if (addProp.TryGetProperty("score", out var scoreProp))
                     {
                         float.TryParse(scoreProp.GetRawText(), out score);
                     }
+                    else if (addProp.TryGetProperty("Score", out var upperScoreProp))
+                    {
+                        float.TryParse(upperScoreProp.GetRawText(), out score);
+                    }
+                }
 
                     string product = node.GetProperty("product").GetString() ?? "Product Note";
                     string version = node.GetProperty("version").GetString() ?? "";
@@ -548,7 +569,7 @@ public class KnowledgeRetrievalRepository : IKnowledgeRetrievalRepository
                         string rawId = prop.GetString() ?? string.Empty;
                         if (string.IsNullOrWhiteSpace(rawId)) continue;
 
-                        if (className == "DocumentLibrary")
+                        if (className == "DocumentationLibrary")
                         {
                             var match = kbPattern.Match(rawId);
                             if (match.Success)

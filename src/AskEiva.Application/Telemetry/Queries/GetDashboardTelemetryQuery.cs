@@ -36,7 +36,7 @@ public class GetDashboardTelemetryQueryHandler : IRequestHandler<GetDashboardTel
 
 public async Task<TelemetryDashboardResult> Handle(GetDashboardTelemetryQuery request, CancellationToken cancellationToken)
     {
-        var docsTask = _retrievalRepository.GetDistinctSourceCountAsync("DocumentLibrary", "document_id");
+        var docsTask = _retrievalRepository.GetDistinctSourceCountAsync("DocumentationLibrary", "document_id");
         var ticketsTask = _retrievalRepository.GetDistinctSourceCountAsync("KnowledgeNode", "source_id"); 
         var releaseTask = _retrievalRepository.GetDistinctSourceCountAsync("SoftwareReleaseNode", "source_id"); 
         var logsTask = _retrievalRepository.GetRawInteractionLogsAsync(limit: 50);
