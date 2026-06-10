@@ -1,7 +1,7 @@
 # 🎓 AskEIVA: Customer Service Agent Platform
 
 [![Funded by: EIVA](https://img.shields.io/badge/Funded%20by-EIVA-0A2540?style=flat-square)](https://www.eiva.com)
-[![Release Version](https://img.shields.io/github/v/release/lauPhilip/AskEivaNet?include_prereleases)]
+![Release Version](https://img.shields.io/github/v/release/lauPhilip/AskEivaNet?include_prereleases)
 [![Platform: .NET 10](https://img.shields.io/badge/Platform-.NET%2010-blueviolet?style=flat-square)](https://dotnet.microsoft.com)
 [![Database: Weaviate Cloud](https://img.shields.io/badge/Database-Weaviate%20Cloud-blue?style=flat-square)](https://weaviate.io)
 
