@@ -57,26 +57,26 @@ The solution structural design isolates domain laws from external storage framew
 └── 📁 Tickets/
     └── 📁 Commands/ 📄 IngestTicketsCommand.cs
 ```
-* ```IngestDocumentationCommand.cs``` — Coordinates the reactive public HTML parsing pipeline, running the custom sliding-window text chunker and streaming nodes directly into Weaviate.
+* ```IngestDocumentationCommand.cs```: Coordinates the reactive public HTML parsing pipeline, running the custom sliding-window text chunker and streaming nodes directly into Weaviate.
 
-* BuildGlobalContextGraphCommand.cs — Triggers background batching routines that extract semantic knowledge triples to construct cross-referenced edges across collections.
+* ```BuildGlobalContextGraphCommand.cs```: Triggers background batching routines that extract semantic knowledge triples to construct cross-referenced edges across collections.
 
-* GetEntityGraphQuery.cs — Retrieves compiled graph layouts from the vector instance to render interactive customer service data maps.
+* ```GetEntityGraphQuery.cs```: Retrieves compiled graph layouts from the vector instance to render interactive customer service data maps.
 
-IngestJiraIssuesCommand.cs — Manages ingestion routines for internal engineering tasks and development tracking history.
+* ```IngestJiraIssuesCommand.cs```: Manages ingestion routines for internal engineering tasks and development tracking history.
 
-AtlassianDocumentParser.cs — Normalizes complex Atlassian Document Format (ADF) payloads into clean text strings for the chunking engine.
+* ```AtlassianDocumentParser.cs```: Normalizes complex Atlassian Document Format (ADF) payloads into clean text strings for the chunking engine.
 
-SearchKnowledgeQuery.cs — Executes optimized hybrid semantic-keyword searches to anchor RAG prompts and prevent LLM hallucinations.
+* ```SearchKnowledgeQuery.cs```: Executes optimized hybrid semantic-keyword searches to anchor RAG prompts and prevent LLM hallucinations.
 
-ExecutePipelineEvaluationCommand.cs — Runs automated evaluation loops against prompt outputs to verify grounding accuracy and system quality.
+* ```ExecutePipelineEvaluationCommand.cs```: Runs automated evaluation loops against prompt outputs to verify grounding accuracy and system quality.
 
-SubmitSwipeFeedbackCommand.cs — Saves human-in-the-loop interaction scores (upvotes/downvotes) to optimize future search rankings.
+* ```SubmitSwipeFeedbackCommand.cs```: Saves human-in-the-loop interaction scores (upvotes/downvotes) to optimize future search rankings.
 
-IngestReleaseNotesCommand.cs — Slices and segments EIVA software product release notes and deployment manifests into traceable reference points.
+* ```IngestReleaseNotesCommand.cs```: Slices and segments EIVA software product release notes and deployment manifests into traceable reference points.
 
-GetDashboardTelemetryQuery.cs — Aggregates live schema counts (documents, tickets, release notes) to drive the state-aware administrative UX safeguards.
+* ```GetDashboardTelemetryQuery.cs```: Aggregates live schema counts (documents, tickets, release notes) to drive the state-aware administrative UX safeguards.
 
-SyncTelemetryBroker.cs — Relays background processing diagnostics and scraper milestones to the Blazor console interface in real-time.
+* ```SyncTelemetryBroker.cs```: Relays background processing diagnostics and scraper milestones to the Blazor console interface in real-time.
 
-IngestTicketsCommand.cs — Processes historical, multi-turn support records into embedded data objects for helpdesk triage tracking.
+* ```IngestTicketsCommand.cs```: Processes historical, multi-turn support records into embedded data objects for helpdesk triage tracking.
