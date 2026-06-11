@@ -31,6 +31,11 @@ The solution structural design isolates domain laws from external storage framew
 └── 📁 AskEiva.WebUI/          # Blazor Interactive Server UI (MudBlazor), real-time log monitors, and network graph visualizations.
 ```
 ---
+### Architectural Diagram
+
+![AskEIVA Clean Architecture Diagram](./diagram.png)
+
+---
 
 ### AskEIVA.Application
 
