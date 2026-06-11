@@ -10,7 +10,7 @@ using MediatR;
 
 namespace AskEiva.Application.Graphs.Commands;
 
-// 💡 ADDED: Progress hook instance added directly into the MediatR request wrapper
+// Progress hook instance added directly into the MediatR request wrapper
 public record BuildGlobalContextGraphCommand(
     int BatchSize = 500, 
     IProgress<GraphProgressReport>? ProgressTracker = null
@@ -68,7 +68,7 @@ public async Task<GraphBuildResult> Handle(BuildGlobalContextGraphCommand reques
                 itemIndexCounter, totalPoolSize, ticketDbId, $"Reassembling fragmented chunks for ticket {ticketDbId}..."
             ));
 
-            // 💡 THE ARCHITECTURAL STEP: Dynamic Parent-Child Stitching
+            // THE ARCHITECTURAL STEP: Dynamic Parent-Child Stitching
             string fullUnifiedTicketBody = await _ticketRepository.GetStitchedTicketContentAsync(ticketDbId);
             
             if (string.IsNullOrWhiteSpace(fullUnifiedTicketBody)) continue;
