@@ -33,7 +33,7 @@ The solution structural design isolates domain laws from external storage framew
 ---
 ### Architectural Diagram
 
-![AskEIVA Clean Architecture Diagram](./diagram.png)
+![AskEIVA Clean Architecture Diagram](Context/architecture/diagram.png)
 
 ---
 
