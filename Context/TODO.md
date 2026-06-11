@@ -25,6 +25,8 @@ This document tracks upcoming feature implementations, system enhancements, and 
 - [ ] **Hybrid Search Balancing:** Implement a runtime slider in the WebUI to adjust the vector-keyword balance (`alpha` parameter) dynamically in `SearchKnowledgeQuery.cs`.
 - [ ] **Evaluation Trace Metrics:** Expand the `EvaluationDashboard.razor` to visually chart automated pipeline test score histories over time.
 - [ ] **Jira Content Parsing:** Harden `AtlassianDocumentParser.cs` to fully reconstruct complex nested tables from raw ADF payloads (JIRA IS NOT WORKING ATM).
+- [ ] **Workflow page with custom ai flows:** moving towards autonomous AI and giving the employees oppurtunity to create their own AI flows.
+- [ ] **Train a specific llm model on the rlhf training data:** Because of the rich data try to train a llm on eivas own param.
 
 ---
 
