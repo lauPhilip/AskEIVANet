@@ -1,0 +1,32 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "askEIVA"
+version = "0.1.4"
+description = "AI Agent for the EIVA Support Team"
+authors = [
+    { name = "Philip Lau" }
+]
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "fastapi>=0.100.0",
+    "uvicorn>=0.23.0",
+    "mistralai>=0.0.12",
+    "weaviate-client>=4.4.0",
+    "unstructured>=0.12.0",
+    "python-dotenv>=1.0.0",
+    "requests>=2.31.0",
+    "beautifulsoup4>=4.12.0",
+    "pymupdf",
+    "tqdm",
+    "streamlit>=1.31.0",
+    "httpx>=0.25.0",
+    "pandas>=2.1.0",
+    "pyvis"
+]
+
+[tool.setuptools.packages.find]
+where = ["src"]

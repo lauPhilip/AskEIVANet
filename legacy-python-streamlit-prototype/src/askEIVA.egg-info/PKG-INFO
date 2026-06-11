@@ -1,0 +1,21 @@
+Metadata-Version: 2.4
+Name: askEIVA
+Version: 0.1.4
+Summary: AI Agent for the EIVA Support Team
+Author: Philip Lau
+Requires-Python: >=3.10
+Description-Content-Type: text/markdown
+Requires-Dist: fastapi>=0.100.0
+Requires-Dist: uvicorn>=0.23.0
+Requires-Dist: mistralai>=0.0.12
+Requires-Dist: weaviate-client>=4.4.0
+Requires-Dist: unstructured>=0.12.0
+Requires-Dist: python-dotenv>=1.0.0
+Requires-Dist: requests>=2.31.0
+Requires-Dist: beautifulsoup4>=4.12.0
+Requires-Dist: pymupdf
+Requires-Dist: tqdm
+Requires-Dist: streamlit>=1.31.0
+Requires-Dist: httpx>=0.25.0
+Requires-Dist: pandas>=2.1.0
+Requires-Dist: pyvis
