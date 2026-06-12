@@ -11,15 +11,35 @@ using MediatR;
 
 namespace AskEiva.Application.Jira.Commands;
 
+/// <summary>
+/// MediatR command to synchronize, process, and vectorize corporate Jira issues based on a JQL tracking filter target.
+/// </summary>
+/// <param name="JqlFilter">The Atlassian Jira Query Language string used to target specific issue updates.</param>
 public record IngestJiraIssuesCommand(string JqlFilter = "updated >= '2000-01-01' order by key asc") : IRequest<JiraIngestionResult>;
 
+/// <summary>
+/// Represents the operation results and execution counts of the Jira ticket ingestion run.
+/// </summary>
+/// <param name="IsSuccess">Indicates if the synchronization completed successfully without throwing exceptions.</param>
+/// <param name="TotalIssuesProcessed">The total number of individual Jira tasks parsed during the execution.</param>
+/// <param name="TotalChunksVectorized">The total number of text segments generated and stored into the vector database.</param>
+/// <param name="Message">Descriptive text summarizing the final outcome or failure details.</param>
 public record JiraIngestionResult(bool IsSuccess, int TotalIssuesProcessed, int TotalChunksVectorized, string Message);
 
+/// <summary>
+/// Handles the fetching of external issues from Atlassian APIs, unifies metadata with comment histories, 
+/// segments long text fields, and saves vector payloads into the target cloud cluster database.
+/// </summary>
 public class IngestJiraIssuesCommandHandler : IRequestHandler<IngestJiraIssuesCommand, JiraIngestionResult>
 {
     private readonly IJiraService _jiraService;
     private readonly HttpClient _weaviateHttpClient;
 
+    /// <summary>
+    /// Initializes a new instance of the handler using the external Jira api client and a vector storage engine http channel client.
+    /// </summary>
+    /// <param name="jiraService">The external service client proxy handling Atlassian API calls.</param>
+    /// <param name="weaviateHttpClient">An HTTP client instance configured to talk to the vector engine endpoint.</param>
     public IngestJiraIssuesCommandHandler(
         IJiraService jiraService, 
         HttpClient weaviateHttpClient)
@@ -28,6 +48,13 @@ public class IngestJiraIssuesCommandHandler : IRequestHandler<IngestJiraIssuesCo
         _weaviateHttpClient = weaviateHttpClient;
     }
 
+    /// <summary>
+    /// Executes the Jira issue synchronization loop, fetching paginated task records, parsing formatting layouts, 
+    /// tracking cross-system ticket mappings, and submitting batch vectors.
+    /// </summary>
+    /// <param name="request">The instruction parameters containing the target JQL criteria strings.</param>
+    /// <param name="cancellationToken">Token used to safely intercept and cancel the ongoing background data ingestion tasks.</param>
+    /// <returns>A results instance containing task counts and database insertion statistics.</returns>
     public async Task<JiraIngestionResult> Handle(IngestJiraIssuesCommand request, CancellationToken cancellationToken)
     {
         int startAt = 0;
@@ -55,6 +82,7 @@ public class IngestJiraIssuesCommandHandler : IRequestHandler<IngestJiraIssuesCo
                     MaxResults = maxResults
                 };
 
+                // Pull the next set of tracking issue payloads using the configuration parameters
                 var response = await _jiraService.GetIssuesPageAsync(queryOptions);
 
                 if (response == null || response.Issues == null || response.Issues.Count == 0)
@@ -68,9 +96,10 @@ public class IngestJiraIssuesCommandHandler : IRequestHandler<IngestJiraIssuesCo
 
                 foreach (var issue in response.Issues)
                 {
-string cleanDescription = AtlassianDocumentParser.ToPlainText(issue.Fields.Description);
+                    // Clean rich-text formatting tags out of the main description body
+                    string cleanDescription = AtlassianDocumentParser.ToPlainText(issue.Fields.Description);
 
-                    // 2. Build a linear, readable comment thread
+                    // 1. Unify and reconstruct sequential chat replies and comment fields into an audit log
                     var commentBuilder = new StringBuilder();
                     if (issue.Fields.CommentCollection?.Comments != null)
                     {
@@ -84,7 +113,7 @@ string cleanDescription = AtlassianDocumentParser.ToPlainText(issue.Fields.Descr
                         }
                     }
 
-                    // 3. 💡 FALLBACK FUSION STRATEGY: Ensure empty descriptions don't blind the vector engine
+                    // 2. Metadata Compilation: Synthesize missing fields to ensure quality vector embeddings
                     var unifiedTextBuilder = new StringBuilder();
                     unifiedTextBuilder.AppendLine($"=== EIVA JIRA ISSUE MANAGEMENT NODE ===");
                     unifiedTextBuilder.AppendLine($"Issue Tracking Key: {issue.Key}");
@@ -99,7 +128,7 @@ string cleanDescription = AtlassianDocumentParser.ToPlainText(issue.Fields.Descr
                     }
                     else
                     {
-                        // Synthesize context for headline-only cards so the embeddings still capture semantic intent
+                        // Fallback message ensures headline-only tickets still possess adequate contextual embeddings weights
                         unifiedTextBuilder.AppendLine($"Description: This tracking card is a title-only tracking objective for '{issue.Fields.Summary}'. No further structural description text was provided");
                     }
 
@@ -111,10 +140,12 @@ string cleanDescription = AtlassianDocumentParser.ToPlainText(issue.Fields.Descr
 
                     string rawFullText = unifiedTextBuilder.ToString();
 
+                    // Segment the combined text block into sliding chunks to preserve continuity in storage nodes
                     var textChunks = SplitTextIntoOverlappingChunks(rawFullText, chunkSize: 1000, overlap: 200);
                     int internalPartIndex = 0;
                     string freshdeskId = "NONE";
 
+                    // Discover linked tracking ticket values using key hashtag extraction loops
                     var match = System.Text.RegularExpressions.Regex.Match(issue.Fields.Summary, @"#(\d+)");
                     if (match.Success)
                     {
@@ -123,6 +154,7 @@ string cleanDescription = AtlassianDocumentParser.ToPlainText(issue.Fields.Descr
 
                     foreach (var chunk in textChunks)
                     {
+                        // Model tracking properties exactly mapping the expected database layout schemas
                         var weaviateObject = new
                         {
                             @class = "JiraIssueNode",
@@ -150,6 +182,7 @@ string cleanDescription = AtlassianDocumentParser.ToPlainText(issue.Fields.Descr
 
                 if (batchObjects.Count > 0)
                 {
+                    // Dispatch the parsed payloads as a single unified batch network request to optimize bandwidth
                     Console.WriteLine($"[Weaviate Writer] Committing batch block payload to vector cloud ({batchObjects.Count} objects)...");
                     var batchPayload = new { objects = batchObjects };
                     var batchResponse = await _weaviateHttpClient.PostAsJsonAsync("v1/batch/objects", batchPayload);
@@ -160,6 +193,7 @@ string cleanDescription = AtlassianDocumentParser.ToPlainText(issue.Fields.Descr
                     }
                 }
 
+                // Increment offsets to traverse downstream paginated index spaces
                 startAt += maxResults;
                 currentPage++;
 
@@ -179,6 +213,13 @@ string cleanDescription = AtlassianDocumentParser.ToPlainText(issue.Fields.Descr
         }
     }
 
+    /// <summary>
+    /// Processes high-length string records into a list of structured sub-segments using a fixed sliding window index range.
+    /// </summary>
+    /// <param name="text">The raw text body content to slice.</param>
+    /// <param name="chunkSize">The relative maximum layout size allocated to any single split fragment.</param>
+    /// <param name="overlap">The character length shared between adjacent index segments to preserve text flow context boundaries.</param>
+    /// <returns>A collection of individual text segment items.</returns>
     private static List<string> SplitTextIntoOverlappingChunks(string text, int chunkSize, int overlap)
     {
         var chunks = new List<string>();
