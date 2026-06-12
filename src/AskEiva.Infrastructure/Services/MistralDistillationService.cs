@@ -8,20 +8,36 @@ using AskEiva.Domain.Services;
 
 namespace AskEiva.Infrastructure.Services;
 
+/// <summary>
+/// Implements the <see cref="IMistralDistillationService"/> contract using an structured JSON 
+/// HTTP inference pipeline to call Mistral AI engines, compiling unlinked records into GraphRAG context chains.
+/// </summary>
 public class MistralDistillationService : IMistralDistillationService
 {
     private readonly HttpClient _httpClient;
 
+    /// <summary>
+    /// Initializes a new instance of the <see cref="MistralDistillationService"/> class with an explicit HTTP client.
+    /// </summary>
+    /// <param name="httpClient">An unmanaged or factory-allocated HTTP client containing Mistral base URL routing and authorization keys.</param>
     public MistralDistillationService(HttpClient httpClient)
     {
         _httpClient = httpClient;
     }
 
+    /// <summary>
+    /// Analyzes a support ticket text string against reference candidates using structured JSON instruction templates 
+    /// to engineer multi-hop context paths ranging from 3 to 15 semantic edges deep.
+    /// </summary>
+    /// <param name="ticketId">The unique alphanumeric tracking key code of the anchor customer ticket.</param>
+    /// <param name="ticketBody">The stitched continuous text dialogue representation of the support ticket lifecycle thread.</param>
+    /// <param name="candidatesContext">The candidate technical manuals or software release logs cross-referenced for linkage.</param>
+    /// <returns>A fully parsed, strongly typed <see cref="ChainCompilationResponse"/> entity containing relational predicates.</returns>
     public async Task<ChainCompilationResponse> CompileContextChainAsync(string ticketId, string ticketBody, string candidatesContext)
     {
         try
         {
-            // 💡 System prompt rewritten to empower Mistral to engineer 3-15 element scenario strings
+            // System prompt rewritten to empower Mistral to engineer 3-15 element scenario strings
             var systemPrompt = """
             You are an advanced GraphRAG Core Compiler for EIVA marine engineering software tracking.
             Your task is to analyze a support ticket alongside matching documentation AND release logs to engineer a context-aware sequence path chain.
@@ -50,7 +66,7 @@ public class MistralDistillationService : IMistralDistillationService
             {candidatesContext}
             """;
 
-            // 💡 Using the recommended replacement endpoint for our 2026 stack!
+            // Using the recommended replacement endpoint for our stack configuration
             var payload = new
             {
                 model = "mistral-medium-3-5",
@@ -84,7 +100,17 @@ public class MistralDistillationService : IMistralDistillationService
         return new ChainCompilationResponse { IsLinked = false };
     }
 
-    // 💡 Keep your old method signature here as a clean legacy fallback to satisfy any outstanding files
+    /// <summary>
+    /// Executes a binary correlation analysis fallback method between an isolated ticket item and a single text element.
+    /// </summary>
+    /// <param name="ticketContent">The core text content node matching the support log row context parameters.</param>
+    /// <param name="referenceContent">The single technical reference item text content block under review.</param>
+    /// <param name="collectionType">The collection partition archetype name assigned to the reference chunk asset.</param>
+    /// <returns>A structured <see cref="DistillationDecision"/> payload detailing connectivity status and edge values.</returns>
+    /// <remarks>
+    /// Note: This method serves as a legacy adapter layout block to satisfy older service signatures while utilizing 
+    /// the upgraded multi-hop graph compiler infrastructure underneath.
+    /// </remarks>
     public async Task<DistillationDecision> AnalyzeRelationshipAsync(string ticketContent, string referenceContent, string collectionType)
     {
         var result = await CompileContextChainAsync("Legacy-ID", ticketContent, referenceContent);

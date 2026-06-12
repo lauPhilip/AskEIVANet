@@ -9,27 +9,40 @@ using AskEiva.Domain.Repositories;
 
 namespace AskEiva.Infrastructure.Repositories;
 
+/// <summary>
+/// Implements the <see cref="IGraphRepository"/> contract using a raw HTTP GraphQL pipeline 
+/// to query, insert, and manage knowledge graph relationship paths directly inside a Weaviate cluster instance.
+/// </summary>
 public class GraphRepository : IGraphRepository
 {
     private readonly HttpClient _httpClient;
 
+    /// <summary>
+    /// Initializes a new instance of the <see cref="GraphRepository"/> class with a pre-configured HTTP client factory.
+    /// </summary>
+    /// <param name="httpClient">An unmanaged or factory-managed HTTP client configured for Weaviate endpoint routing targets.</param>
     public GraphRepository(HttpClient httpClient)
     {
         _httpClient = httpClient;
     }
 
-public async Task<bool> InsertChainAsync(GraphContextChain chain)
+    /// <summary>
+    /// Commits a newly distilled, relational knowledge graph context chain entity into the Weaviate vector database.
+    /// </summary>
+    /// <param name="chain">The structural graph context chain domain model tracking semantic predicates and confidence scores.</param>
+    /// <returns>True if the payload successfully committed without server anomalies, otherwise false.</returns>
+    public async Task<bool> InsertChainAsync(GraphContextChain chain)
     {
         try
         {
-            // 💡 FIXED: Force serializer options to use lowercase snake_case property profiles!
+            // Force serializer options to use lowercase snake_case property profiles matching the database schema
             var serializationOptions = new JsonSerializerOptions
             {
                 PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower,
                 WriteIndented = false
             };
 
-            // Package into the format Weaviate's rest engine expects
+            // Package into the explicit JSON payload format that Weaviate's REST engine expects
             var payload = new
             {
                 @class = "GraphContextChain",
@@ -64,49 +77,61 @@ public async Task<bool> InsertChainAsync(GraphContextChain chain)
         }
     }
 
+    /// <summary>
+    /// Queries the vector database using raw GraphQL conditional filters to check if a support ticket has already been distilled.
+    /// </summary>
+    /// <param name="ticketId">The unique tracking cross-system ticket identifier (e.g., "FD-10293").</param>
+    /// <returns>True if the matching row count is greater than zero, ensuring processing idempotency.</returns>
     public async Task<bool> HasTicketBeenProcessedAsync(string ticketId)
-{
-    try
     {
-        var graphQlQuery = $$"""
+        try
         {
-          Get {
-            GraphContextChain(
-              where: {
-                path: ["ticket_id"]
-                operator: Equal
-                valueText: "{{ticketId}}"
+            var graphQlQuery = $$"""
+            {
+              Get {
+                GraphContextChain(
+                  where: {
+                    path: ["ticket_id"]
+                    operator: Equal
+                    valueText: "{{ticketId}}"
+                  }
+                  limit: 1
+                ) {
+                  ticket_id
+                }
               }
-              limit: 1
-            ) {
-              ticket_id
             }
-          }
+            """;
+
+            var response = await _httpClient.PostAsJsonAsync("v1/graphql", new { query = graphQlQuery });
+            if (!response.IsSuccessStatusCode) return false;
+
+            using var jsonDocument = await JsonDocument.ParseAsync(await response.Content.ReadAsStreamAsync());
+            var root = jsonDocument.RootElement;
+
+            if (root.TryGetProperty("data", out var dataNode) && 
+                dataNode.TryGetProperty("Get", out var getCollection) &&
+                getCollection.TryGetProperty("GraphContextChain", out var chainArray))
+            {
+                return chainArray.ValueKind == JsonValueKind.Array && chainArray.GetArrayLength() > 0;
+            }
+
+            return false;
         }
-        """;
-
-        var response = await _httpClient.PostAsJsonAsync("v1/graphql", new { query = graphQlQuery });
-        if (!response.IsSuccessStatusCode) return false;
-
-        using var jsonDocument = await JsonDocument.ParseAsync(await response.Content.ReadAsStreamAsync());
-        var root = jsonDocument.RootElement;
-
-        if (root.TryGetProperty("data", out var dataNode) && 
-            dataNode.TryGetProperty("Get", out var getCollection) &&
-            getCollection.TryGetProperty("GraphContextChain", out var chainArray))
+        catch
         {
-            return chainArray.ValueKind == JsonValueKind.Array && chainArray.GetArrayLength() > 0;
+            // Fallback defensively to process if validation verification checks drop
+            return false; 
         }
-
-        return false;
     }
-    catch
-    {
-        return false; // Fallback defensively to process if verification check drops
-    }
-}
 
-    // 💡 THE GRAPHRAG ENGINE ENGINE: Performs hybrid semantic lookup directly against path text weights
+    /// <summary>
+    /// Executes a hybrid nearVector proximity query using high-dimensional array structures 
+    /// to retrieve semantic paths matching active user technical prompts.
+    /// </summary>
+    /// <param name="queryVector">The unalterable memory-mapped block holding the raw floating-point token calculations.</param>
+    /// <param name="maxResults">The maximum priority limit count of structural paths to extract from the cluster layer.</param>
+    /// <returns>A list containing matching context chains populated with confidence indicators and semantic metadata summaries.</returns>
     public async Task<List<GraphContextChain>> SearchGraphContextAsync(ReadOnlyMemory<float> queryVector, int maxResults)
     {
         var results = new List<GraphContextChain>();
@@ -163,6 +188,11 @@ public async Task<bool> InsertChainAsync(GraphContextChain chain)
         return results;
     }
 
+    /// <summary>
+    /// Extracts all structural relationship nodes mapped out and assigned to a single cross-system support ticket identifier.
+    /// </summary>
+    /// <param name="ticketId">The unique identification key of the target support ticket anchor.</param>
+    /// <returns>A list of matching graph context paths linked directly back to the specified ticket identifier.</returns>
     public async Task<List<GraphContextChain>> GetChainsByTicketAsync(string ticketId)
     {
         var results = new List<GraphContextChain>();
@@ -201,7 +231,10 @@ public async Task<bool> InsertChainAsync(GraphContextChain chain)
                 }
             }
         }
-        catch { /* Fallback */ }
+        catch 
+        { 
+            /* Fallback defensively to return empty arrays if structural network streams fault */ 
+        }
         return results;
     }
 }

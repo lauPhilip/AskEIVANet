@@ -12,15 +12,28 @@ using AskEiva.Domain.ValueObjects;
 
 namespace AskEiva.Infrastructure.Repositories;
 
+/// <summary>
+/// Implements the <see cref="IDocumentationRepository"/> contract using an optimized 
+/// <see cref="HttpClient"/> pipeline to communicate directly with a Weaviate vector database instance.
+/// </summary>
 public class DocumentationRepository : IDocumentationRepository
 {
     private readonly HttpClient _httpClient;
 
+    /// <summary>
+    /// Initializes a new instance of the <see cref="DocumentationRepository"/> class with a pre-configured HTTP client.
+    /// </summary>
+    /// <param name="httpClient">An unmanaged or factory-managed HTTP client pointing to the Weaviate REST api base url.</param>
     public DocumentationRepository(HttpClient httpClient)
     {
         _httpClient = httpClient;
     }
 
+    /// <summary>
+    /// Inserts or updates an unsegmented parent documentation entry record within the Weaviate database instance.
+    /// </summary>
+    /// <param name="docNode">The domain documentation node entity containing metadata references and raw body content.</param>
+    /// <returns>An asynchronous task tracking the execution of the storage transaction.</returns>
     public async Task UpsertDocumentationAsync(DocumentationNode docNode)
     {
         var url = "v1/objects";
@@ -40,7 +53,7 @@ public class DocumentationRepository : IDocumentationRepository
         };
 
         var response = await _httpClient.PostAsJsonAsync(url, payload);
-        // Ensure success or gracefully log if class doesn't exist yet
+        
         if (!response.IsSuccessStatusCode)
         {
             string err = await response.Content.ReadAsStringAsync();
@@ -48,8 +61,18 @@ public class DocumentationRepository : IDocumentationRepository
         }
     }
 
-    // 💡 THE CHUNKING VECTORIZER ENGINE: Batches data straight into Weaviate cluster collections
-// 💡 UPGRADED BULK POSTING ENGINE: Streams data matrices using Weaviate's high-performance batch endpoints
+    /// <summary>
+    /// Streams and pushes collection segments of processed text chunk value objects directly 
+    /// into Weaviate using its high-performance bulk processing endpoints.
+    /// </summary>
+    /// <param name="chunks">The sequence of broken, word-bounded text chunk value objects containing localized contents.</param>
+    /// <param name="documentType">The categorical grouping classification assigned to the source document asset (e.g., "NaviPac").</param>
+    /// <param name="globalTags">The collection of metadata tracking labels applied uniformly across all segment nodes in the batch.</param>
+    /// <returns>An asynchronous task tracking the execution of the batch transactions.</returns>
+    /// <remarks>
+    /// Note: To maximize token threshold constraints and maintain optimal cluster memory consumption, 
+    /// chunks are partitioned into sub-packages containing a maximum limit of 40 records per network request.
+    /// </remarks>
     public async Task BatchIngestDocChunksAsync(IEnumerable<TextChunk> chunks, string documentType, List<string> globalTags)
     {
         var url = "v1/batch/objects";
@@ -57,16 +80,16 @@ public class DocumentationRepository : IDocumentationRepository
         // Map data elements directly onto your new centralized collection schema identity
         var batchObjects = chunks.Select(chunk => new
         {
-            @class = "DocumentationLibrary", // 💡 ASSIGNED TO NEW CORRECT ENHANCED TARGET
+            @class = "DocumentationLibrary", // Assigned to new correct enhanced target schema
             properties = new
             {
                 document_id = chunk.ChunkId,
-                title = chunk.Metadata.ContainsKey("Subject") ? chunk.Metadata["Subject"] : "Technical Manual Article",
+                title = chunk.Metadata.TryGetValue("Subject", out var subject) ? subject : "Technical Manual Article",
                 document_type = documentType,
                 content = chunk.Content,
-                url = chunk.Metadata.ContainsKey("Url") ? chunk.Metadata["Url"] : "https://eiva.freshdesk.com",
-                image_urls = chunk.ImageUrls ?? new List<string>(),
-                tags = globalTags ?? new List<string>()
+                url = chunk.Metadata.TryGetValue("Url", out var targetUrl) ? targetUrl : "https://eiva.freshdesk.com",
+                image_urls = chunk.ImageUrls ?? [],
+                tags = globalTags ?? []
             }
         }).ToList();
 

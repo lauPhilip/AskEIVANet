@@ -8,17 +8,31 @@ using Microsoft.Extensions.Logging;
 
 namespace AskEiva.Infrastructure.Repositories
 {
-    public class WeaviateSchemaProvisioner
+/// <summary>
+/// Provides idempotent database initialization pipelines responsible for checking, creating, 
+/// and updating Weaviate vector collection schemas, indexing rules, and text compression topologies.
+/// </summary>
+public class WeaviateSchemaProvisioner
     {
         private readonly HttpClient _httpClient;
         private readonly ILogger<WeaviateSchemaProvisioner> _logger;
 
+        /// <summary>
+        /// Initializes a new instance of the <see cref="WeaviateSchemaProvisioner"/> class with an authorized client.
+        /// </summary>
+        /// <param name="httpClient">An unmanaged or factory-allocated HTTP client pre-configured with Weaviate connection headers.</param>
+        /// <param name="logger">The application logging instance used to track system deployment output.</param>
         public WeaviateSchemaProvisioner(HttpClient httpClient, ILogger<WeaviateSchemaProvisioner> logger)
         {
             _httpClient = httpClient;
             _logger = logger;
         }
 
+        /// <summary>
+        /// Coordinates the chronological execution of class provisioning steps to confirm all target data layers 
+        /// are verified or configured inside the Weaviate instance.
+        /// </summary>
+        /// <returns>An asynchronous task tracking deployment pipeline operations.</returns>
         public async Task EnsureSchemaAsync()
         {
             try
@@ -43,7 +57,7 @@ namespace AskEiva.Infrastructure.Repositories
                 var releaseNotesSchema = CreateSoftwareReleaseSchema();
                 await ProvisionClassIfNeededAsync("SoftwareReleaseNode", releaseNotesSchema);
 
-                // 🎯 MATCHED SETUP: Provisioning the DocumentationLibrary using the exact same factory pattern helper method
+                // Provisioning the DocumentationLibrary using the exact same factory pattern helper method
                 var documentationLibrarySchema = CreateDocumentationLibrarySchema();
                 await ProvisionClassIfNeededAsync("DocumentationLibrary", documentationLibrarySchema);
 
@@ -57,6 +71,9 @@ namespace AskEiva.Infrastructure.Repositories
                 _logger.LogCritical(ex, "An unhandled exception collapsed the global schema configuration loop.");
             }
         }
+        /// <summary>
+        /// Compiles the vector index rules and property arrays required to initialize the DocumentationLibrary schema.
+        /// </summary>
         private object CreateDocumentationLibrarySchema()
         {
             return new
@@ -89,6 +106,10 @@ namespace AskEiva.Infrastructure.Repositories
             };
         }
 
+        /// <summary>
+        /// Verifies or constructs the foundational multi-source ticket chunk class schema using an optimized HNSW structure 
+        /// combined with a Product Quantizer (PQ) to maximize operational vector caching thresholds.
+        /// </summary>
         private async Task EnsureKnowledgeNodeClassAsync()
         {
             var checkUrl = "v1/schema/KnowledgeNode";
@@ -143,6 +164,10 @@ namespace AskEiva.Infrastructure.Repositories
             }
         }
 
+        /// <summary>
+        /// Verifies or provisions the storage schema designed to preserve multi-hop knowledge graph relationships 
+        /// extracted during contextual distillation loops.
+        /// </summary>
         private async Task EnsureGraphContextChainClassAsync()
         {
             var checkUrl = "v1/schema/GraphContextChain";
@@ -194,6 +219,9 @@ namespace AskEiva.Infrastructure.Repositories
             }
         }
 
+        /// <summary>
+        /// Verifies or provisions the vector storage schema tracking Atlassian Jira issue trackers and software bugs.
+        /// </summary>
         private async Task EnsureJiraSchemaAsync()
         {
             try
@@ -233,6 +261,9 @@ namespace AskEiva.Infrastructure.Repositories
             }
         }
 
+        /// <summary>
+        /// Compiles the vector layout definition mapping out processed changelogs and firmware deployment metrics.
+        /// </summary>
         private object CreateSoftwareReleaseSchema()
         {
             return new
@@ -260,6 +291,11 @@ namespace AskEiva.Infrastructure.Repositories
             };
         }
 
+        /// <summary>
+        /// Core abstract pipeline worker checking if an individual collection is active, dropping into REST deployment streams if missing.
+        /// </summary>
+        /// <param name="className">The case-sensitive schema collection class layout identity to query.</param>
+        /// <param name="schema">The anonymous collection metadata properties payload configuration tree to establish.</param>
         private async Task ProvisionClassIfNeededAsync(string className, object schema)
         {
             try

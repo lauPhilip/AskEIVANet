@@ -1,25 +1,46 @@
+using System;
+using System.Collections.Generic;
 using System.IO;
-using System.Net.Http.Json;
+using System.Linq;
+using System.Net.Http;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using System.Threading.Tasks;
 using AskEiva.Domain.Services;
 using AskEiva.Domain.ValueObjects;
 using AskEiva.Domain.Entities;
 
 namespace AskEiva.Infrastructure.Services;
 
+/// <summary>
+/// Implements the <see cref="IMistralChatService"/> contract using a highly efficient, token-by-token 
+/// Server-Sent Events (SSE) streaming pipeline to dispatch contextual prompts to Mistral AI endpoints.
+/// </summary>
 public class MistralChatService : IMistralChatService
 {
     private readonly HttpClient _httpClient;
     private const string MistralModel = "mistral-large-latest";
 
+    /// <summary>
+    /// Initializes a new instance of the <see cref="MistralChatService"/> class with a pre-configured HTTP client factory.
+    /// </summary>
+    /// <param name="httpClient">An unmanaged or factory-allocated HTTP client injected with system connection headers and API keys.</param>
     public MistralChatService(HttpClient httpClient)
     {
         _httpClient = httpClient;
     }
 
-public async IAsyncEnumerable<string> GenerateStreamingChatResponseAsync(
+    /// <summary>
+    /// Compiles standard semantic text blocks alongside structural multi-hop graph context paths and back-and-forth 
+    /// session records into a unified reasoning prompt, yielding individual token words in real time.
+    /// </summary>
+    /// <param name="userQuestion">The incoming, unresolved natural language question from the maritime support operator.</param>
+    /// <param name="semanticContext">A sequence of text fragments retrieved from standard vector search lookups.</param>
+    /// <param name="structuralGraphMashes">A collection of multi-hop causal relation paths linking historical workspaces together.</param>
+    /// <param name="conversationHistory">The back-and-forth interaction history logs within the active user session.</param>
+    /// <returns>An asynchronous stream yielding real-time text fragments from the language model engine.</returns>
+    public async IAsyncEnumerable<string> GenerateStreamingChatResponseAsync(
         string userQuestion, 
         IEnumerable<RetrievalMatch> semanticContext, 
         IEnumerable<GraphContextChain> structuralGraphMashes,
@@ -33,7 +54,7 @@ public async IAsyncEnumerable<string> GenerateStreamingChatResponseAsync(
             contextBuilder.AppendLine($"[{match.SourceType}] Title: {match.Title}\nContent: {match.Content}\n---");
         }
 
-        // 2. 💡 NEW: Inject your distilled multi-hop graph path relationships seamlessly
+        // 2. Inject distilled multi-hop graph path relationships seamlessly
         if (structuralGraphMashes != null && structuralGraphMashes.Any())
         {
             contextBuilder.AppendLine("\n=== RETRIEVED HISTORICAL WORKSPACE GRAPH-MESH SCENARIOS ===");
@@ -81,6 +102,7 @@ public async IAsyncEnumerable<string> GenerateStreamingChatResponseAsync(
             Content = new StringContent(JsonSerializer.Serialize(payload), Encoding.UTF8, "application/json")
         };
 
+        // Enforce ResponseHeadersRead to process server-sent chunks without caching the entire stream inside application buffers
         using var response = await _httpClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead);
         if (!response.IsSuccessStatusCode)
         {
@@ -95,7 +117,7 @@ public async IAsyncEnumerable<string> GenerateStreamingChatResponseAsync(
         {
             if (string.IsNullOrWhiteSpace(line) || !line.StartsWith("data: ")) continue;
 
-            var data = line.Substring(6).Trim();
+            var data = line[6..].Trim();
             if (data == "[DONE]") break;
 
             MistralStreamChunk? chunk = null;
@@ -111,15 +133,36 @@ public async IAsyncEnumerable<string> GenerateStreamingChatResponseAsync(
 }
 
 // --- STREAMING-SPECIFIC DESERIALIZATION SCHEMAS ---
+
+/// <summary>
+/// Root data wrapper structure for incoming JSON data packets during Server-Sent Events (SSE) chat streams.
+/// </summary>
 public class MistralStreamChunk
 {
+    /// <summary>
+    /// Gets or sets the individual structural layout options associated with this streaming segment slice.
+    /// </summary>
     [JsonPropertyName("choices")] public List<MistralStreamChoice>? Choices { get; set; }
 }
+
+/// <summary>
+/// Intermediate data model capturing sequential delta evaluation steps inside incoming model stream lists.
+/// </summary>
 public class MistralStreamChoice
 {
+    /// <summary>
+    /// Gets or sets the localized text delta payload token sent inside the server stream.
+    /// </summary>
     [JsonPropertyName("delta")] public MistralStreamDelta? Delta { get; set; }
 }
+
+/// <summary>
+/// Pinpoints the inner raw data text content slice calculated by the language model during this sequence pass.
+/// </summary>
 public class MistralStreamDelta
 {
+    /// <summary>
+    /// Gets or sets the partial text content slice tracking string value.
+    /// </summary>
     [JsonPropertyName("content")] public string Content { get; set; } = string.Empty;
 }

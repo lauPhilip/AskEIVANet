@@ -9,16 +9,30 @@ using HtmlAgilityPack;
 
 namespace AskEiva.Infrastructure.Services;
 
+/// <summary>
+/// Implements the <see cref="IDocumentationCrawler"/> domain contract using <see cref="HtmlAgilityPack"/> 
+/// to crawl, scrape, parse, and yield public technical documentation assets from external helpdesk portals.
+/// </summary>
 public class DocumentationCrawler : IDocumentationCrawler
 {
     private readonly HttpClient _httpClient;
     private const string BasePortalUrl = "https://eiva.freshdesk.com";
 
+    /// <summary>
+    /// Initializes a new instance of the <see cref="DocumentationCrawler"/> class with an explicit HTTP client.
+    /// </summary>
+    /// <param name="httpClient">The system infrastructure HTTP client factory instance used for routing targets.</param>
     public DocumentationCrawler(HttpClient httpClient)
     {
         _httpClient = httpClient;
     }
 
+    /// <summary>
+    /// Connects to the root public solution dashboard, parses available article link paths via XPath selectors, 
+    /// and streams parsed, metadata-enriched documentation assets asynchronously.
+    /// </summary>
+    /// <param name="categoryId">The unique categorization filter key identifying the online section or folder tree to target.</param>
+    /// <returns>An asynchronous stream yielding fully populated <see cref="DocumentationNode"/> entities as they are parsed.</returns>
     public async IAsyncEnumerable<DocumentationNode> CrawlSolutionsAsync(string categoryId)
     {
         Console.WriteLine("[Public Web Scraper] Initializing open web parsing pipeline against EIVA Helpdesk...");
@@ -55,16 +69,16 @@ public class DocumentationCrawler : IDocumentationCrawler
             string href = linkNode.GetAttributeValue("href", string.Empty);
             if (string.IsNullOrWhiteSpace(href)) continue;
 
-            // Normalize link structure pathways
+            // Normalize link structure pathways from relative to absolute address chains
             if (!href.StartsWith("http"))
             {
                 href = href.StartsWith("/") ? $"{BasePortalUrl}{href}" : $"{BasePortalUrl}/{href}";
             }
 
-            // Clean off tracking query strings to keep strings completely pristine
-            if (href.Contains("?")) href = href.Split('?')[0];
+            // Clean off tracking query strings to keep URLs completely pristine
+            if (href.Contains('?')) href = href.Split('?')[0];
 
-            if (!uniquelyFoundUrls.Add(href)) continue; // Skip duplicates
+            if (!uniquelyFoundUrls.Add(href)) continue; // Skip duplicate targets
 
             DocumentationNode? parsedNode = null;
             try
@@ -74,7 +88,7 @@ public class DocumentationCrawler : IDocumentationCrawler
                 var rootNode = articlePageDoc?.DocumentNode;
                 if (rootNode == null) continue;
 
-                // Target standard Freshdesk article layout container nodes safely
+                // Target standard Freshdesk article layout container nodes safely using cascading selector fallbacks
                 var titleHeader = rootNode.SelectSingleNode("//h2[contains(@class, 'heading')]") 
                                   ?? rootNode.SelectSingleNode("//h1") 
                                   ?? rootNode.SelectSingleNode("//title");
@@ -85,7 +99,7 @@ public class DocumentationCrawler : IDocumentationCrawler
 
                 if (bodyArticleContent != null)
                 {
-                    // 💡 FIXED CS0029: Explicit boolean null comparison check used here!
+                    // Fixed compiler CS0029 error block using explicit boolean null validation check
                     string cleanTitle = titleHeader != null ? titleHeader.InnerText.Trim() : "EIVA Reference Guide";
                     
                     // Extract any raw PDF attachment elements present on the page context 
@@ -100,7 +114,7 @@ public class DocumentationCrawler : IDocumentationCrawler
                         }
                     }
 
-                    // EXTRACED CONTENT: Retain inner HTML formatting tags for the TextSplitter
+                    // RETAIN INNER HTML: Keep raw structural tags (like img markers) intact so the TextSplitter utility can parse them
                     string fullContentHtml = bodyArticleContent.InnerHtml;
                     string extractedId = href.Split('/').LastOrDefault() ?? Guid.NewGuid().ToString();
 
@@ -123,11 +137,11 @@ public class DocumentationCrawler : IDocumentationCrawler
 
             if (parsedNode != null)
             {
-                // Yield the rich document node into the stream instantly
+                // Yield the rich document node into the asynchronous data stream instantly
                 yield return parsedNode;
             }
 
-            // Polite scraping interval pace gap 
+            // Polite scraping interval pace gap to protect external network infrastructure thresholds
             await Task.Delay(100);
         }
     }

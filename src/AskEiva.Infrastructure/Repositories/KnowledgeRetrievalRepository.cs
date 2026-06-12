@@ -15,13 +15,24 @@ using AskEiva.Domain.Entities;
 
 namespace AskEiva.Infrastructure.Repositories;
 
+/// <summary>
+/// Implements the <see cref="IKnowledgeRetrievalRepository"/> contract using a dual-client 
+/// architecture to orchestrate vector queries, telemetry compilation, automated test generation, 
+/// and thread-safe RLHF telemetry persistence.
+/// </summary>
 public class KnowledgeRetrievalRepository : IKnowledgeRetrievalRepository
 {
     private readonly HttpClient _weaviateClient;
     private readonly HttpClient _mistralClient;
     
+    /// <summary>
+    /// Enforces mutual exclusion during local JSON matrix reads and writes to prevent telemetry file corruption.
+    /// </summary>
     private static readonly SemaphoreSlim _fileLock = new(1, 1);
     
+    /// <summary>
+    /// Absolute platform path tracking where the local Reinforcement Learning from Human Feedback dataset matrix is saved.
+    /// </summary>
     private readonly string _evaluationDatasetPath = Path.Combine(
         AppDomain.CurrentDomain.BaseDirectory, 
         "..", "..", "..", "..", "..", 
@@ -29,12 +40,24 @@ public class KnowledgeRetrievalRepository : IKnowledgeRetrievalRepository
         "eiva_rlhf_training_matrix.json"
     );
 
+    /// <summary>
+    /// Initializes a new instance of the <see cref="KnowledgeRetrievalRepository"/> class using an explicit 
+    /// HTTP configuration pipeline and a managed client factory infrastructure.
+    /// </summary>
+    /// <param name="httpClient">An unmanaged or factory-managed HTTP client mapped to the Weaviate REST service.</param>
+    /// <param name="httpClientFactory">The system infrastructure factory used to resolve specialized clients (e.g., Mistral endpoints).</param>
     public KnowledgeRetrievalRepository(HttpClient httpClient, IHttpClientFactory httpClientFactory)
     {
         _weaviateClient = httpClient;
         _mistralClient = httpClientFactory.CreateClient("MistralClient");
     }
 
+    /// <summary>
+    /// Executes a parallel multi-collection hybrid semantic query (Alpha = 0.5) across support logs, technical documentation, and software release nodes.
+    /// </summary>
+    /// <param name="userQuery">The plain-text search prompt submitted by the operator.</param>
+    /// <param name="limit">The localized limit variable indicating how many records to prioritize.</param>
+    /// <returns>A consolidated, relevance-ranked sequence of unalterable retrieval match items.</returns>
     public async Task<IEnumerable<RetrievalMatch>> SearchSemanticChunksAsync(string userQuery, int limit)
     {
         var url = "v1/graphql";
@@ -94,18 +117,18 @@ public class KnowledgeRetrievalRepository : IKnowledgeRetrievalRepository
             {
                 foreach (var node in ticketNodes.EnumerateArray())
                 {
-                float score = 0.0f;
-                if (node.TryGetProperty("_additional", out var addProp))
-                {
-                    if (addProp.TryGetProperty("score", out var scoreProp))
+                    float score = 0.0f;
+                    if (node.TryGetProperty("_additional", out var addProp))
                     {
-                        float.TryParse(scoreProp.GetRawText(), out score);
+                        if (addProp.TryGetProperty("score", out var scoreProp))
+                        {
+                            float.TryParse(scoreProp.GetRawText(), out score);
+                        }
+                        else if (addProp.TryGetProperty("Score", out var upperScoreProp))
+                        {
+                            float.TryParse(upperScoreProp.GetRawText(), out score);
+                        }
                     }
-                    else if (addProp.TryGetProperty("Score", out var upperScoreProp))
-                    {
-                        float.TryParse(upperScoreProp.GetRawText(), out score);
-                    }
-                }
 
                     matches.Add(new RetrievalMatch(
                         SourceId: node.GetProperty("source_id").GetString() ?? string.Empty,
@@ -123,18 +146,18 @@ public class KnowledgeRetrievalRepository : IKnowledgeRetrievalRepository
             {
                 foreach (var node in docNodes.EnumerateArray())
                 {
-                float score = 0.0f;
-                if (node.TryGetProperty("_additional", out var addProp))
-                {
-                    if (addProp.TryGetProperty("score", out var scoreProp))
+                    float score = 0.0f;
+                    if (node.TryGetProperty("_additional", out var addProp))
                     {
-                        float.TryParse(scoreProp.GetRawText(), out score);
+                        if (addProp.TryGetProperty("score", out var scoreProp))
+                        {
+                            float.TryParse(scoreProp.GetRawText(), out score);
+                        }
+                        else if (addProp.TryGetProperty("Score", out var upperScoreProp))
+                        {
+                            float.TryParse(upperScoreProp.GetRawText(), out score);
+                        }
                     }
-                    else if (addProp.TryGetProperty("Score", out var upperScoreProp))
-                    {
-                        float.TryParse(upperScoreProp.GetRawText(), out score);
-                    }
-                }
 
                     matches.Add(new RetrievalMatch(
                         SourceId: node.TryGetProperty("document_id", out var idProp) ? idProp.GetString() ?? string.Empty : string.Empty,
@@ -152,18 +175,18 @@ public class KnowledgeRetrievalRepository : IKnowledgeRetrievalRepository
             {
                 foreach (var node in releaseNodes.EnumerateArray())
                 {
-                float score = 0.0f;
-                if (node.TryGetProperty("_additional", out var addProp))
-                {
-                    if (addProp.TryGetProperty("score", out var scoreProp))
+                    float score = 0.0f;
+                    if (node.TryGetProperty("_additional", out var addProp))
                     {
-                        float.TryParse(scoreProp.GetRawText(), out score);
+                        if (addProp.TryGetProperty("score", out var scoreProp))
+                        {
+                            float.TryParse(scoreProp.GetRawText(), out score);
+                        }
+                        else if (addProp.TryGetProperty("Score", out var upperScoreProp))
+                        {
+                            float.TryParse(upperScoreProp.GetRawText(), out score);
+                        }
                     }
-                    else if (addProp.TryGetProperty("Score", out var upperScoreProp))
-                    {
-                        float.TryParse(upperScoreProp.GetRawText(), out score);
-                    }
-                }
 
                     string product = node.GetProperty("product").GetString() ?? "Product Note";
                     string version = node.GetProperty("version").GetString() ?? "";
@@ -191,22 +214,34 @@ public class KnowledgeRetrievalRepository : IKnowledgeRetrievalRepository
         }
     }
 
+    /// <summary>
+    /// Compiles a fallback evaluation item block used defensively when the repository fails to connect to structural cluster indexes.
+    /// </summary>
+    /// <param name="count">The limitation quantity tracking how many static scenarios to output.</param>
+    /// <returns>A populated collection layout of validation cases.</returns>
     private List<EvaluationTestCase> GetFallbackBaselineDeck(int count)
-    {
-        var fallback = new List<EvaluationTestCase>
         {
-            new EvaluationTestCase(
-                Id: "FD-70821",
-                Query: "[FD-70821] Navipac-Dongle10513497-DB Version 4.0.3.0\n\nLooking for advice regarding Master Helmsman PC sensor registration telemetry drifts.",
-                ProposedAnswer: "Proposed Fix: Configure baseline communication bindings down to alternative virtual port addresses or apply firmware updates matching your hardware profile layout constraints.",
-                GroundTruth: "Verified Engineering Fix: Update primary USBL serial buffer IO frames via NaviPac's dynamic configuration module system manager layout.",
-                ExpectedContextKeys: new() { "NaviPac", "KnowledgeNode" },
-                ContextDocumentationChunks: new() { "Documentation Manual reference fragment: Ensure dongle drivers are properly mapped in offline machine profiles." }
-            )
-        };
-        return fallback.Take(count).ToList();
-    }
+            var fallback = new List<EvaluationTestCase>
+            {
+                new EvaluationTestCase(
+                    Id: "FD-70821",
+                    Query: "[FD-70821] Navipac-Dongle10513497-DB Version 4.0.3.0\n\nLooking for advice regarding Master Helmsman PC sensor registration telemetry drifts.",
+                    ProposedAnswer: "Proposed Fix: Configure baseline communication bindings down to alternative virtual port addresses or apply firmware updates matching your hardware profile layout constraints.",
+                    GroundTruth: "Verified Engineering Fix: Update primary USBL serial buffer IO frames via NaviPac's dynamic configuration module system manager layout.",
+                    ExpectedContextKeys: new() { "NaviPac", "KnowledgeNode" },
+                    ContextDocumentationChunks: new() { "Documentation Manual reference fragment: Ensure dongle drivers are properly mapped in offline machine profiles." }
+                )
+            };
+            return fallback.Take(count).ToList();
+        }
 
+    /// <summary>
+    /// Generates evaluation matrices by parsing closed technical tickets, separating customer issues from support replies, 
+    /// resolving contextual documentation nodes, and computing Mistral evaluation benchmarks.
+    /// </summary>
+    /// <param name="phase">The tracking deployment stage classification (e.g., ClosedBaseline).</param>
+    /// <param name="count">The targeted total item threshold size to return for the testing suite.</param>
+    /// <returns>A collection stream loaded with synthesized validation cases.</returns>
     public async Task<List<EvaluationTestCase>> FetchEvaluationDeckByPhaseAsync(EvaluationPhase phase, int count)
     {
         var deck = new List<EvaluationTestCase>();
@@ -276,13 +311,13 @@ public class KnowledgeRetrievalRepository : IKnowledgeRetrievalRepository
                             isolatedCustomerQuery = continuousText;
                             isolatedAgentGroundTruth = "Resolved via standard technical operational validation protocols.";
                         }
-
+                        // Sanitize conversational boilerplate out of the prompt
                         isolatedCustomerQuery = Regex.Replace(isolatedCustomerQuery, @"^Hello[\s\S]*?(?=Hope|Looking|We)", "", RegexOptions.IgnoreCase);
 
                         var supportingDocs = await RetrieveSupportingDocumentationChunksAsync(subjectLine, isolatedCustomerQuery);
                         string proposedModelFix = await GenerateMistralProposedSolutionAsync(isolatedCustomerQuery, isolatedAgentGroundTruth, supportingDocs);
 
-                        // 💡 DYNAMIC CATEGORIES MATCH: Matches all official product strings
+                        // Extract official product category badges using regex boundaries
                         var badges = ParseDynamicContextKeys(continuousText);
 
                         deck.Add(new EvaluationTestCase(
@@ -305,12 +340,18 @@ public class KnowledgeRetrievalRepository : IKnowledgeRetrievalRepository
         return deck;
     }
 
+    /// <summary>
+    /// Core search routine used during validation steps to fetch reference manuals matching active ticket parameters.
+    /// </summary>
     private async Task<List<string>> RetrieveSupportingDocumentationChunksAsync(string subject, string queryText)
     {
         var searchMatches = await SearchSemanticChunksAsync($"{subject} {queryText}", limit: 2);
         return searchMatches.Where(m => m.SourceType == "DocumentLibrary").Select(m => m.Content).ToList();
     }
 
+    /// <summary>
+    /// Dispatches prompt configurations to Mistral infrastructure to compute optimized engineering predictions.
+    /// </summary>
     private async Task<string> GenerateMistralProposedSolutionAsync(string customerIssue, string agentAnswers, List<string> docs)
     {
         var promptPayload = new
@@ -375,20 +416,24 @@ public class KnowledgeRetrievalRepository : IKnowledgeRetrievalRepository
         return "Verification Check Required: Review standard product release matrix guidelines to troubleshoot connection links.";
     }
 
-    // --- 💡 THE MASTER EIVA PRODUCT SPECIFICATION REGEX ENGINE ---
+    /// <summary>
+    /// Validates raw interaction data blocks against a strict collection of high-fidelity EIVA product tokens using 
+    /// explicitly compiled word boundary regex engines.
+    /// </summary>
+    /// <param name="fullBody">The continuous plain text compiled from historical files or ticket threads.</param>
+    /// <returns>A collection array listing matching product categories combined with default category mappings.</returns>
     private List<string> ParseDynamicContextKeys(string fullBody)
     {
         var discoveredBadges = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
-        // All official high-fidelity categories to search inside text contexts
-        string[] eivaProducts = new string[]
-        {
+        string[] eivaProducts =
+        [
             "NaviSuite", "NaviPac", "NaviScan", "NaviEdit", "NaviModel", "NaviPlot", 
             "NaviSuite Beka", "NaviSuite Nardoa", "NaviSuite Uca", "Workflow Manager", 
             "QuickStitch Utility", "Catenary option", "NaviSuite Mobula", "NaviSuite Kuda", 
             "NaviSuite Perio", "NaviSuite QC Toolbox", "Voyis VSLAM", "Powered by EIVA", 
             "NaviSuite ROTV", "ScanFish", "ViperFish", "ATTU Mk II", "ATTU Mk I", "ATTU"
-        };
+        ];
 
         foreach (var product in eivaProducts)
         {
@@ -408,6 +453,11 @@ public class KnowledgeRetrievalRepository : IKnowledgeRetrievalRepository
         return discoveredBadges.ToList();
     }
 
+    /// <summary>
+    /// Extracts a topological raw graph metadata slice from Weaviate using filter constraints to build relationship meshes.
+    /// </summary>
+    /// <param name="filterText">An optional text query to slice or trim unlinked nodes from the graph canvas.</param>
+    /// <returns>A JsonElement container holding array nodes and confidence profiles.</returns>
     public async Task<JsonElement> FetchRawGraphMeshJsonAsync(string filterText)
     {
         var url = "v1/graphql";
@@ -446,6 +496,12 @@ public class KnowledgeRetrievalRepository : IKnowledgeRetrievalRepository
         }
     }
 
+    /// <summary>
+    /// Direct retrieval search mechanism used to extract full structural graph paths matching a user question.
+    /// </summary>
+    /// <param name="userQuery">The plain-text question or keyword filter submitted by the client.</param>
+    /// <param name="limit">The upper limitation value of matching mesh assets to extract from storage structures.</param>
+    /// <returns>A collection containing matching graph context chains loaded with their respective predicates.</returns>
     public async Task<IEnumerable<GraphContextChain>> SearchGraphTriplesAsync(string userQuery, int limit)
     {
         var url = "v1/graphql";
@@ -513,6 +569,11 @@ public class KnowledgeRetrievalRepository : IKnowledgeRetrievalRepository
         }
     }
 
+    /// <summary>
+    /// Executes an aggregation query against Weaviate cluster collections to count total row records.
+    /// </summary>
+    /// <param name="className">The case-sensitive collection target class name.</param>
+    /// <returns>The total database object count tracking inside that partition layout space.</returns>
     public async Task<int> GetTotalClassCountAsync(string className)
     {
         var jsonQuery = new { query = $"{{ Aggregate {{ {className} {{ meta {{ count }} }} }} }}" };
@@ -535,6 +596,13 @@ public class KnowledgeRetrievalRepository : IKnowledgeRetrievalRepository
         return 0;
     }
 
+    /// <summary>
+    /// Extracts chunks sequentially to determine the total count of distinct, parent-level documents matching 
+    /// custom identification schemas.
+    /// </summary>
+    /// <param name="className">The case-sensitive collection schema partition target.</param>
+    /// <param name="propertyName">The specific metadata property string field to analyze.</param>
+    /// <returns>The total running count of isolated unique parent records.</returns>
     public async Task<int> GetDistinctSourceCountAsync(string className, string propertyName)
     {
         var gqlQuery = $$"""
@@ -600,6 +668,11 @@ public class KnowledgeRetrievalRepository : IKnowledgeRetrievalRepository
         return 0;
     }
 
+    /// <summary>
+    /// Extracts historical user conversation records and platform answer payloads out of storage.
+    /// </summary>
+    /// <param name="limit">The maximum limit number of audit log fields to return.</param>
+    /// <returns>A JSON schema block containing sequenced interaction parameters.</returns>
     public async Task<JsonElement> GetRawInteractionLogsAsync(int limit)
     {
         var jsonQuery = new { query = $"{{ Get {{ InteractionLog(limit: {limit}) {{ query answer was_successful timestamp }} }} }}" };
@@ -617,6 +690,13 @@ public class KnowledgeRetrievalRepository : IKnowledgeRetrievalRepository
         return default;
     }
 
+    /// <summary>
+    /// Commits a permanent operational audit entry logging an exchange transaction into the interaction database space.
+    /// </summary>
+    /// <param name="query">The natural text string submitted by the user.</param>
+    /// <param name="answer">The plain-text answer produced by the agent engine.</param>
+    /// <param name="wasSuccessful">True if the operator accepted the answer profile without tracking flags or rejections.</param>
+    /// <returns>An asynchronous task tracking execution completion.</returns>
     public async Task LogInteractionAsync(string query, string answer, bool wasSuccessful)
     {
         var url = "v1/objects";
@@ -643,6 +723,12 @@ public class KnowledgeRetrievalRepository : IKnowledgeRetrievalRepository
         }
     }
 
+    /// <summary>
+    /// Direct ingestion engine designed to process software release nodes using a chunk size boundary limitation of 30 
+    /// items per loop to optimize remote cluster performance limits.
+    /// </summary>
+    /// <param name="nodes">The sequence collection holding software version change notes.</param>
+    /// <returns>An asynchronous task tracking batch execution progress metrics.</returns>
     public async Task BatchIngestReleaseNodesAsync(IEnumerable<SoftwareReleaseNode> nodes)
     {
         var url = "v1/batch/objects";
@@ -711,6 +797,13 @@ public class KnowledgeRetrievalRepository : IKnowledgeRetrievalRepository
         Console.WriteLine($"\n[Weaviate Ingestion Engine] Task Finished! Total of {totalIngestedCount} out of {allBatchObjects.Count} records indexed successfully into the cluster.\n");
     }
 
+    /// <summary>
+    /// Executes conditional matching across target product title keys and distribution version strings 
+    /// to identify duplicate records.
+    /// </summary>
+    /// <param name="product">The target application profile keyword (e.g., NaviEdit).</param>
+    /// <param name="version">The targeted version layout tracking distribution string (e.g., 4.2.1).</param>
+    /// <returns>True if the matching node count inside the database class equals or exceeds 1.</returns>
     public async Task<bool> DoesProductVersionExistAsync(string product, string version)
     {
         var url = "v1/graphql";
@@ -754,6 +847,13 @@ public class KnowledgeRetrievalRepository : IKnowledgeRetrievalRepository
         return false;
     }
 
+    /// <summary>
+    /// Performs nearObject cross-reference queries utilizing an anchor support ticket's UUID vector location 
+    /// to extract adjacent context elements from manuals and release charts.
+    /// </summary>
+    /// <param name="ticketId">The primary storage object tracking UUID string of the anchor support node.</param>
+    /// <param name="maxResults">The prioritized limitation size capping the quantity of adjacent results to pull.</param>
+    /// <returns>A context list loaded with adjacent tracking elements, mapped with suggested edge relationship predicates.</returns>
     public async Task<List<TechnicalContextSearchResult>> SearchTechnicalContextAsync(string ticketId, int maxResults)
     {
         var results = new List<TechnicalContextSearchResult>();
@@ -834,6 +934,12 @@ public class KnowledgeRetrievalRepository : IKnowledgeRetrievalRepository
         return results.OrderBy(x => Guid.NewGuid()).Take(maxResults).ToList();
     }
 
+    /// <summary>
+    /// Commits and appends a reinforced human-in-the-loop audit pair log back to the training dataset file tree 
+    /// using a thread-safe semaphore lock barrier.
+    /// </summary>
+    /// <param name="log">The validation log capturing system states, generated responses, and human adjustments.</param>
+    /// <returns>An asynchronous task tracking execution completion states.</returns>
     public async Task SaveSwipeTelemetryAsync(EvaluationFeedbackLog log)
     {
         string? directoryPath = Path.GetDirectoryName(_evaluationDatasetPath);
