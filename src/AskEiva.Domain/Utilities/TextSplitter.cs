@@ -7,14 +7,25 @@ using AskEiva.Domain.Entities;
 
 namespace AskEiva.Domain.Utilities;
 
+/// <summary>
+/// Provides high-efficiency sliding-window text segmentation utilities to sanitize HTML strings, 
+/// extract image targets, and slice continuous bodies into size-bounded vector text chunks.
+/// </summary>
 public class TextSplitter
 {
     private readonly int _chunkSize;
     private readonly int _chunkOverlap;
     
-    // Regex to extract image source links from Freshdesk HTML content
+    /// <summary>
+    /// Compiled, case-insensitive regular expression used to discover and isolate image resource URLs from HTML tags.
+    /// </summary>
     private static readonly Regex ImageRegex = new(@"<img[^>]+src=[""']([^""']+)[""']", RegexOptions.Compiled | RegexOptions.IgnoreCase);
 
+    /// <summary>
+    /// Initializes a new instance of the text splitter configuration with customized character count sizes and overlap windows.
+    /// </summary>
+    /// <param name="chunkSize">The absolute maximum length of characters allowed within an individual slice (defaults to 1000).</param>
+    /// <param name="chunkOverlap">The character buffer size duplicated between consecutive segments to maintain sentence semantic context (defaults to 200).</param>
     public TextSplitter(int chunkSize = 1000, int chunkOverlap = 200)
     {
         _chunkSize = chunkSize;
@@ -22,8 +33,10 @@ public class TextSplitter
     }
 
     /// <summary>
-    /// Slices historic customer support tickets into vectorized chunks (Unchanged)
+    /// Slices raw historical customer support ticket conversation loops into formatted, overlapping token chunks.
     /// </summary>
+    /// <param name="ticket">The parent support ticket node entity containing raw discussion log data.</param>
+    /// <returns>A collection sequence of individual, sequence-tracked text chunk value objects.</returns>
     public IEnumerable<TextChunk> SplitTicket(TicketNode ticket)
     {
         var chunks = new List<TextChunk>();
@@ -41,9 +54,12 @@ public class TextSplitter
             int length = Math.Min(_chunkSize, cleanText.Length - position);
             var content = cleanText.Substring(position, length);
 
+            // Adjust boundary split point if we aren't evaluating the absolute end of the document
             if (position + length < cleanText.Length)
             {
                 int lastSeparator = content.LastIndexOfAny(new[] { '.', '\n', ' ' });
+                
+                // Truncate length smoothly up to a valid natural word or punctuation separator point
                 if (lastSeparator > _chunkSize * 0.5) 
                 {
                     length = lastSeparator + 1;
@@ -68,6 +84,8 @@ public class TextSplitter
             ));
 
             sequence++;
+            
+            // Step forward by the exact segment length minus the predefined overlap buffer
             position += (length - _chunkOverlap) > 0 ? (length - _chunkOverlap) : length;
         }
 
@@ -75,9 +93,11 @@ public class TextSplitter
     }
 
     /// <summary>
-    /// 💡 NEW OVERLOAD: Explicitly tailored to handle dense technical EIVA User Manuals and Guides 
-    /// without falling into sentence-punctuation parsing traps.
+    /// Slices dense technical engineering manuals and guides into size-bounded vector text chunks 
+    /// without splitting technical terms or words mid-sentence.
     /// </summary>
+    /// <param name="doc">The documentation node entity containing technical data and manual records.</param>
+    /// <returns>A collection sequence of formatted, metadata-enriched text chunk value objects.</returns>
     public IEnumerable<TextChunk> SplitDocumentation(DocumentationNode doc)
     {
         var chunks = new List<TextChunk>();
@@ -142,6 +162,11 @@ public class TextSplitter
         return chunks;
     }
 
+    /// <summary>
+    /// Evaluates raw source strings with compiled regular expressions to discover embedded image web sources.
+    /// </summary>
+    /// <param name="htmlContent">The uncleaned text or HTML markup structure containing possible image source elements.</param>
+    /// <returns>A list of clean uniform resource identifiers mapping image links.</returns>
     private List<string> ExtractImageUrls(string htmlContent)
     {
         var urls = new List<string>();
@@ -158,6 +183,12 @@ public class TextSplitter
         return urls;
     }
 
+    /// <summary>
+    /// Decodes HTML syntax structures, maps break tags to literal platform structural layout elements, 
+    /// and flattens whitespace clusters to maximize database indexing efficiency.
+    /// </summary>
+    /// <param name="htmlContent">The raw unparsed string extracted from documentation pipelines or ticket APIs.</param>
+    /// <returns>A completely flat, plain text string free of markup tags and trailing spaces.</returns>
     private string CleanHtml(string htmlContent)
     {
         if (string.IsNullOrEmpty(htmlContent)) return string.Empty;
